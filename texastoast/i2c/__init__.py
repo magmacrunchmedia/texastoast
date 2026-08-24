@@ -1,6 +1,5 @@
-"""I2C hardware abstraction for Magma Hub controllers.
+from texastoast.i2c.bus import I2CBus
+from texastoast.i2c.hub import MagmaHub
+from texastoast.i2c.protocol import ControllerState, CONTROLLER_SIZE, BUTTONS_ADDR, JOYSTICK_ADDR
 
-This module is optional and requires smbus2 (Raspberry Pi only).
-If smbus2 is not installed, the rest of texastoast still works
-with keyboard input.
-"""
+__all__ = ["I2CBus", "MagmaHub", "ControllerState"]

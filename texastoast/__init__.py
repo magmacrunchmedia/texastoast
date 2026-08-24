@@ -16,9 +16,14 @@ def __getattr__(name):
         from texastoast.world import TileMap, Entity, AABB
         return {"TileMap": TileMap, "Entity": Entity, "AABB": AABB}[name]
 
-    if name in ("InputState", "KeyboardInput"):
-        from texastoast.input import InputState, KeyboardInput
-        return {"InputState": InputState, "KeyboardInput": KeyboardInput}[name]
+    if name in ("InputState", "KeyboardInput", "MagmaHubInput", "CompositeInput"):
+        from texastoast.input import InputState, KeyboardInput, MagmaHubInput, CompositeInput
+        return {"InputState": InputState, "KeyboardInput": KeyboardInput,
+                "MagmaHubInput": MagmaHubInput, "CompositeInput": CompositeInput}[name]
+
+    if name in ("I2CBus", "MagmaHub", "ControllerState"):
+        from texastoast.i2c import I2CBus, MagmaHub, ControllerState
+        return {"I2CBus": I2CBus, "MagmaHub": MagmaHub, "ControllerState": ControllerState}[name]
 
     if name in ("DialogueBox", "Menu", "HUD"):
         from texastoast.ui import DialogueBox, Menu, HUD
@@ -39,6 +44,11 @@ __all__ = [
     "AABB",
     "InputState",
     "KeyboardInput",
+    "MagmaHubInput",
+    "CompositeInput",
+    "I2CBus",
+    "MagmaHub",
+    "ControllerState",
     "DialogueBox",
     "Menu",
     "HUD",
