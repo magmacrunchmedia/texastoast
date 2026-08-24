@@ -5,7 +5,7 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] — unreleased
+## [0.2.0] — 2026-08-24
 
 A correctness release. Several bugs meant the engine did not behave the way its
 own README described; fixing the movement one required a breaking API change.
