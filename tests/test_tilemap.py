@@ -96,6 +96,7 @@ def test_tilemap_save_load_roundtrip(tmp_path):
     loaded = TileMap.from_file(path)
     assert loaded.grid == grid
     assert loaded.tile_size == 32
+    assert loaded._solid_tiles == {1, 2}
 
 
 def test_tilemap_load_ignores_saved_tile_size_when_override(tmp_path):

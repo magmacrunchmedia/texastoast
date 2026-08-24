@@ -90,7 +90,7 @@ class HUD:
 
             if stat.show_bar:
                 bar_x = x
-                bar_y = y + 14
+                bar_y = y + (14 if stat.show_text else 0)
                 ratio = stat.value / stat.max_value if stat.max_value > 0 else 0
                 self._canvas.create_rectangle(
                     bar_x, bar_y, bar_x + bar_width, bar_y + bar_height,

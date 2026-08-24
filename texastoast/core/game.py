@@ -60,8 +60,11 @@ class Game:
     def quit(self):
         if self._loop:
             self._loop.stop()
-        self._root.quit()
-        self._root.destroy()
+        try:
+            self._root.quit()
+            self._root.destroy()
+        except tk.TclError:
+            pass
 
     def bind_key(self, key: str, callback: Callable):
         self._root.bind(key, callback)

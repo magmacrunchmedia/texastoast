@@ -29,7 +29,7 @@ class DialogueBox:
         self._full_text = ""
         self._displayed = ""
         self._char_index = 0
-        self._after_id: Optional[str] = None
+        self._after_id: Optional[int] = None
         self._on_complete: Optional[Callable] = None
         self._speaker = ""
         self._waiting = False

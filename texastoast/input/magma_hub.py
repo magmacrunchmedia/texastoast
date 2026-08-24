@@ -10,6 +10,8 @@ from texastoast.i2c.hub import MagmaHub
 
 logger = logging.getLogger(__name__)
 
+_IDLE = InputState()
+
 
 class MagmaHubInput:
     """Reads controller input from a Magma Hub I2C device.
@@ -55,7 +57,7 @@ class CompositeInput:
     """Combines keyboard and Magma Hub input — falls back to keyboard
     when no hub is connected."""
 
-    def __init__(self, keyboard, hub_input: Optional[MagmaHubInput] = None):
+    def __init__(self, keyboard=None, hub_input: Optional[MagmaHubInput] = None):
         self._keyboard = keyboard
         self._hub_input = hub_input
 
@@ -63,14 +65,20 @@ class CompositeInput:
     def active_source(self) -> str:
         if self._hub_input and self._hub_input.connected:
             return "magma_hub"
-        return "keyboard"
+        if self._keyboard:
+            return "keyboard"
+        return "none"
 
     def poll(self) -> InputState:
         if self._hub_input and self._hub_input.connected:
             return self._hub_input.poll()
-        return self._keyboard.poll()
+        if self._keyboard:
+            return self._keyboard.poll()
+        return _IDLE
 
     def is_pressed(self, button: str) -> bool:
         if self._hub_input and self._hub_input.connected:
             return self._hub_input.is_pressed(button)
-        return self._keyboard.is_pressed(button)
+        if self._keyboard:
+            return self._keyboard.is_pressed(button)
+        return False

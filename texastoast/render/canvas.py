@@ -14,7 +14,6 @@ class CanvasRenderer:
         self._width = width
         self._height = height
         self._camera = Camera(width, height)
-        self._tile_rects: dict[tuple[int, int], int] = {}
 
     @property
     def canvas(self) -> tk.Canvas:
@@ -26,7 +25,6 @@ class CanvasRenderer:
 
     def clear(self):
         self._canvas.delete("all")
-        self._tile_rects.clear()
 
     def draw_tilemap(self, tilemap, tile_colors: dict[int, str]):
         cam = self._camera

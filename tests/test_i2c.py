@@ -72,9 +72,15 @@ def test_composite_input_fallback():
 
     # Mock hub is never "connected"
     composite = CompositeInput(None, hub_input)
-    assert composite.active_source == "keyboard"
+    assert composite.active_source == "none"
+    # poll() should not crash even with keyboard=None
+    state = composite.poll()
+    assert state.up is False
 
 
 def test_composite_input_no_hub():
     composite = CompositeInput(None, None)
-    assert composite.active_source == "keyboard"
+    assert composite.active_source == "none"
+    state = composite.poll()
+    assert state.up is False
+    assert composite.is_pressed("a") is False
