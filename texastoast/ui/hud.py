@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 
 @dataclass
@@ -74,7 +73,7 @@ class HUD:
         bar_height = 10
         line_height = 20
 
-        for key, stat in self._stats.items():
+        for stat in self._stats.values():
             if stat.show_text:
                 self._canvas.create_text(
                     x, y, text=stat.label, fill="#cccccc",
@@ -107,5 +106,5 @@ class HUD:
             y += line_height + (bar_height + 4 if stat.show_bar else 0)
 
     def _render_texts(self):
-        for key, (text, x, y, opts) in self._custom_texts.items():
+        for text, x, y, opts in self._custom_texts.values():
             self._canvas.create_text(x, y, text=text, tags=self._tag, **opts)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Optional, Callable
+from collections.abc import Callable
 
 
 class Menu:
@@ -30,8 +30,8 @@ class Menu:
         self._active = False
         self._items: list[dict] = []
         self._selected = 0
-        self._on_select: Optional[Callable[[int, str], None]] = None
-        self._on_cancel: Optional[Callable] = None
+        self._on_select: Callable[[int, str], None] | None = None
+        self._on_cancel: Callable | None = None
         self._tag = "menu"
         self._title = ""
 
@@ -46,8 +46,8 @@ class Menu:
     def show(
         self,
         items: list[str],
-        on_select: Optional[Callable[[int, str], None]] = None,
-        on_cancel: Optional[Callable] = None,
+        on_select: Callable[[int, str], None] | None = None,
+        on_cancel: Callable | None = None,
         title: str = "",
         selected: int = 0,
     ):

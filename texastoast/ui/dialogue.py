@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Optional, Callable
+from collections.abc import Callable
 
 
 class DialogueBox:
@@ -29,8 +29,8 @@ class DialogueBox:
         self._full_text = ""
         self._displayed = ""
         self._char_index = 0
-        self._after_id: Optional[int] = None
-        self._on_complete: Optional[Callable] = None
+        self._after_id: int | None = None
+        self._on_complete: Callable | None = None
         self._speaker = ""
         self._waiting = False
         self._tag = "dialogue"
@@ -43,7 +43,7 @@ class DialogueBox:
     def waiting(self) -> bool:
         return self._waiting
 
-    def show(self, text: str, speaker: str = "", on_complete: Optional[Callable] = None):
+    def show(self, text: str, speaker: str = "", on_complete: Callable | None = None):
         self._cancel_pending()
         self._full_text = text
         self._speaker = speaker
