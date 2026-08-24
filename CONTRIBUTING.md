@@ -49,8 +49,8 @@ CI runs `ruff check .` and fails on any finding.
 
 ## Releasing
 
-Releases are published to PyPI by GitHub Actions via Trusted Publishing; no API
-token is stored in the repo.
+Releases are published to PyPI by GitHub Actions, using the same
+`PYPI_API_TOKEN` secret as the other magmacrunch packages.
 
 1. Update `CHANGELOG.md` — move the unreleased section under the new version.
 2. Bump `__version__` in `texastoast/__init__.py`. That is the single source of
@@ -64,9 +64,13 @@ token is stored in the repo.
 4. The release workflow builds the sdist and wheel, verifies the tag matches
    `__version__`, and publishes.
 
-### One-time PyPI setup
+The workflow also verifies the tag matches `__version__`, publishes with
+`skip-existing`, and opens a GitHub Release with generated notes.
 
-Trusted Publishing must be enabled once, by a PyPI maintainer of the project:
-in the texastoast project settings on PyPI, add a trusted publisher for the
-`magmacrunchmedia/texastoast` repository with workflow `release.yml` and
-environment `pypi`. Until that is done the publish step will fail.
+### PyPI credentials
+
+Publishing uses the `PYPI_API_TOKEN` secret. If it is an organization-level
+secret it is already available here; if it is scoped to a single repository, add
+it to texastoast's secrets too. The PyPI token itself must be account-scoped, or
+scoped to include the texastoast project — a token scoped only to another
+project will fail with a 403.
