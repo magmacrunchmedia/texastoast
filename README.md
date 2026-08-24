@@ -9,6 +9,14 @@ Python RPG engine with I2C hardware abstraction for magmacrunch game systems.
 
 A tkinter-based 2D game engine inspired by [adenosine](https://github.com/magmacrunchmedia/adenosine), with optional I2C support for Raspberry Pi hardware.
 
+It ships a [hardware dev kit](#hardware-dev-kit) too: a simulator, a controller
+test bench, and session record/replay, so you can build and test against I2C
+controllers you do not have plugged in — or have not finished building.
+
+```bash
+pip install texastoast && texastoast-bench --sim
+```
+
 ## Install
 
 ```bash
@@ -228,8 +236,19 @@ for the `hardware` extra is a manual pass on a Raspberry Pi:
 
 ## Documentation
 
-Full guides live in the [wiki](https://github.com/magmacrunchmedia/texastoast/wiki).
-The reference below covers the whole public API.
+Full guides live in the [wiki](https://github.com/magmacrunchmedia/texastoast/wiki);
+the reference below covers the whole public API.
+
+| Guide | Covers |
+|-------|--------|
+| [Getting Started](https://github.com/magmacrunchmedia/texastoast/wiki/Getting-Started) | Build a small game from nothing |
+| [Core Concepts](https://github.com/magmacrunchmedia/texastoast/wiki/Core-Concepts) | The loop, `dt`, how the pieces fit |
+| [Rendering and Camera](https://github.com/magmacrunchmedia/texastoast/wiki/Rendering-and-Camera) | Drawing, camera easing, the backend protocols |
+| [Input](https://github.com/magmacrunchmedia/texastoast/wiki/Input) | Sources, `InputState`, record and replay |
+| [UI Components](https://github.com/magmacrunchmedia/texastoast/wiki/UI-Components) | Dialogue, menus, HUD, drawing groups |
+| [Magma Hub and I2C](https://github.com/magmacrunchmedia/texastoast/wiki/Magma-Hub-and-I2C) | The wire protocol and hardware interface |
+| [Hardware Dev Kit](https://github.com/magmacrunchmedia/texastoast/wiki/Hardware-Dev-Kit) | Simulator, test bench, polling, recording |
+| [Tile Editor](https://github.com/magmacrunchmedia/texastoast/wiki/Tile-Editor) | The map editor and its JSON format |
 
 ## API Reference
 
@@ -255,6 +274,7 @@ game = Game(width=640, height=480, root=my_frame)
 from texastoast import CanvasRenderer, Camera
 
 renderer = CanvasRenderer(game.canvas, 640, 480)
+renderer.width, renderer.height   # the viewport; UI widgets read this back
 
 # A tile is drawn when its id has a color; ids you leave out stay transparent.
 renderer.draw_tilemap(tilemap, {0: "#7cb342", 1: "#5d4037"})
@@ -265,11 +285,24 @@ renderer.draw_image(x, y, photo_image)
 renderer.draw_text(x, y, text)                  # world space, follows the camera
 renderer.draw_hud_text(x, y, text, fill="#fff") # screen space, ignores the camera
 
-# Camera — pass dt so the easing is frame-rate independent
+# Camera — pass dt; omitting it is deprecated and becomes an error in 0.5.0
 renderer.camera.follow(target_x, target_y, map_width=800, map_height=600, dt=dt)
 renderer.camera.set_position(x, y)
 renderer.camera.world_to_screen(wx, wy)
 renderer.camera.is_visible(x, y, w, h)
+
+renderer.present()   # no-op on tkinter; end every render() with it anyway
+```
+
+`CanvasRenderer` satisfies two protocols — `Renderer` (world space) and
+`UISurface` (screen space, what the UI widgets draw through). They are the
+contract a future SDL/framebuffer backend implements; `present()` is included
+now because a buffered backend cannot add it later without editing every game.
+
+```python
+from texastoast import Renderer, UISurface
+
+isinstance(renderer, Renderer), isinstance(renderer, UISurface)   # (True, True)
 ```
 
 ### World
@@ -465,7 +498,10 @@ Needs magmascript 3.2 or newer. See [examples/hello.mgs](examples/hello.mgs).
 - **Configurable** — pass callbacks and data, don't inherit from base classes
 - **Tiny** — small, focused modules with minimal dependencies
 - **Graceful fallback** — I2C hardware is optional, keyboard always works
-- **Testable** — game logic doesn't depend on tkinter
+- **Testable** — game logic doesn't depend on tkinter, and the hardware layer
+  is simulatable end to end, so the whole suite runs with no display and no I2C
+- **Portable by seam** — backends sit behind protocols, so the engine can leave
+  tkinter without rewriting the games
 
 ## Contributing
 
