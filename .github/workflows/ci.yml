@@ -43,12 +43,18 @@ jobs:
 
       - run: pip install -e ".[dev,sprites]"
 
+      # TEXASTOAST_REQUIRE_TK turns a missing display into a failure instead of
+      # letting the UI tests skip and report green.
       - name: Run tests (Linux)
         if: runner.os == 'Linux'
+        env:
+          TEXASTOAST_REQUIRE_TK: "1"
         run: xvfb-run -a pytest -v
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
+        env:
+          TEXASTOAST_REQUIRE_TK: "1"
         run: pytest -v
 
   build:

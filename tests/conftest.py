@@ -9,6 +9,7 @@ parts matter: creating a second root after destroying the first fails on some
 Tcl builds ("couldn't read file init.tcl"), so the availability probe keeps
 the root it made rather than discarding it.
 """
+import os
 import tkinter as tk
 
 import pytest
@@ -24,6 +25,20 @@ TK_AVAILABLE = _ROOT is not None
 requires_tk = pytest.mark.skipif(
     not TK_AVAILABLE, reason="no display available for tkinter"
 )
+
+# Skipping is right on a developer's headless box, but in CI it would turn a
+# broken display setup into a silent green run that tests none of the renderer,
+# loop, Game lifecycle or editor. CI sets this to make that a hard failure.
+REQUIRE_TK = os.environ.get("TEXASTOAST_REQUIRE_TK") == "1"
+
+
+def pytest_configure(config):
+    if REQUIRE_TK and not TK_AVAILABLE:
+        raise pytest.UsageError(
+            "TEXASTOAST_REQUIRE_TK=1 but tkinter has no usable display, so the "
+            "UI tests would silently skip. Install a display (xvfb-run on "
+            "Linux) or unset the variable."
+        )
 
 
 @pytest.fixture
