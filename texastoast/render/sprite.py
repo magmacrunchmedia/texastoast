@@ -50,6 +50,12 @@ class SpriteSheet:
         if self._image is None:
             self.load(root)
 
+        if col < 0 or row < 0 or col >= self.cols or row >= self.rows:
+            raise ValueError(
+                f"Frame ({col}, {row}) out of bounds "
+                f"(sheet is {self.cols}x{self.rows} frames)"
+            )
+
         if HAS_PIL and self._pil_image is not None:
             frame = self._extract_pil_frame(col, row)
         else:

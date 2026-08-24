@@ -16,13 +16,19 @@ class TileMap:
     ):
         self._grid = grid
         self._tile_size = tile_size
-        self._solid_tiles = solid_tiles or set()
+        self._solid_tiles = solid_tiles if solid_tiles is not None else set()
 
     @classmethod
-    def from_file(cls, path: str | Path, tile_size: int = 16, solid_tiles: Optional[set[int]] = None) -> TileMap:
+    def from_file(cls, path: str | Path, tile_size: Optional[int] = None, solid_tiles: Optional[set[int]] = None) -> TileMap:
         with open(path) as f:
             data = json.load(f)
-        return cls(data["grid"], tile_size=tile_size, solid_tiles=solid_tiles or set(data.get("solid_tiles", [])))
+        ts = tile_size if tile_size is not None else data.get("tile_size", 16)
+        st = solid_tiles if solid_tiles is not None else set(data.get("solid_tiles", []))
+        return cls(data["grid"], tile_size=ts, solid_tiles=st)
+
+    @property
+    def grid(self) -> list[list[int]]:
+        return self._grid
 
     @property
     def tile_size(self) -> int:
@@ -34,7 +40,9 @@ class TileMap:
 
     @property
     def cols(self) -> int:
-        return len(self._grid[0]) if self._grid else 0
+        if not self._grid:
+            return 0
+        return max(len(row) for row in self._grid)
 
     @property
     def width(self) -> int:
@@ -45,12 +53,12 @@ class TileMap:
         return self.rows * self._tile_size
 
     def get(self, col: int, row: int) -> int:
-        if 0 <= row < self.rows and 0 <= col < self.cols:
+        if 0 <= row < self.rows and 0 <= col < len(self._grid[row]):
             return self._grid[row][col]
         return -1
 
     def set(self, col: int, row: int, tile_id: int):
-        if 0 <= row < self.rows and 0 <= col < self.cols:
+        if 0 <= row < self.rows and 0 <= col < len(self._grid[row]):
             self._grid[row][col] = tile_id
 
     def is_solid(self, col: int, row: int) -> bool:
@@ -71,7 +79,7 @@ class TileMap:
         data = {
             "grid": self._grid,
             "tile_size": self._tile_size,
-            "solid_tiles": list(solid_tiles or self._solid_tiles),
+            "solid_tiles": list(solid_tiles if solid_tiles is not None else self._solid_tiles),
         }
         with open(path, "w") as f:
             json.dump(data, f, indent=2)

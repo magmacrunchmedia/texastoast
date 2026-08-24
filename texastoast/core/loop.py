@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 
 class GameLoop:
     """Tick-based game loop using tkinter's after() for scheduling."""
+
+    MAX_DT = 0.1  # clamp dt to prevent physics explosions on large gaps
 
     def __init__(
         self,
@@ -39,6 +44,7 @@ class GameLoop:
         self._running = True
         self._last_time = time.monotonic()
         self._fps_timer = self._last_time
+        self._frame_count = 0
         self._tick()
 
     def stop(self):
@@ -52,11 +58,14 @@ class GameLoop:
             return
 
         now = time.monotonic()
-        dt = now - self._last_time
+        dt = min(now - self._last_time, self.MAX_DT)
         self._last_time = now
 
-        self._update_fn(dt)
-        self._render_fn()
+        try:
+            self._update_fn(dt)
+            self._render_fn()
+        except Exception:
+            logger.exception("Exception in game loop update/render")
 
         self._frame_count += 1
         if now - self._fps_timer >= 1.0:

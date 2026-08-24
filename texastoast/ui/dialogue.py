@@ -44,6 +44,7 @@ class DialogueBox:
         return self._waiting
 
     def show(self, text: str, speaker: str = "", on_complete: Optional[Callable] = None):
+        self._cancel_pending()
         self._full_text = text
         self._speaker = speaker
         self._on_complete = on_complete
@@ -52,21 +53,29 @@ class DialogueBox:
         self._active = True
         self._waiting = False
         self._draw_box()
-        self._tick_type()
+
+        if not text:
+            self._displayed = ""
+            self._waiting = True
+            self._render_text()
+        else:
+            self._tick_type()
 
     def dismiss(self):
         if not self._active:
             return
         if self._waiting:
             self._active = False
+            self._cancel_pending()
             self._clear()
             if self._on_complete:
                 self._on_complete()
         elif not self._waiting and self._char_index < len(self._full_text):
+            self._cancel_pending()
             self._displayed = self._full_text
             self._char_index = len(self._full_text)
-            self._render_text()
             self._waiting = True
+            self._render_text()
 
     def _tick_type(self):
         if not self._active:
@@ -80,6 +89,12 @@ class DialogueBox:
             )
         else:
             self._waiting = True
+            self._render_text()
+
+    def _cancel_pending(self):
+        if self._after_id:
+            self._canvas.after_cancel(self._after_id)
+            self._after_id = None
 
     def _draw_box(self):
         self._clear()
@@ -127,7 +142,5 @@ class DialogueBox:
             )
 
     def _clear(self):
-        if self._after_id:
-            self._canvas.after_cancel(self._after_id)
-            self._after_id = None
+        self._cancel_pending()
         self._canvas.delete(self._tag)

@@ -67,4 +67,8 @@ class Game:
         self._root.bind(key, callback)
 
     def bind_key_release(self, key: str, callback: Callable):
-        self._root.bind(key, callback)
+        if key.startswith("<") and key.endswith(">"):
+            inner = key[1:-1]
+            self._root.bind(f"<KeyRelease-{inner}>", callback)
+        else:
+            self._root.bind(f"<KeyRelease-{key}>", callback)

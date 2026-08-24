@@ -51,8 +51,11 @@ class Menu:
         title: str = "",
         selected: int = 0,
     ):
+        if not items:
+            return
         self._items = [{"label": label, "enabled": True} for label in items]
         self._selected = max(0, min(selected, len(self._items) - 1))
+        self._snap_to_enabled()
         self._on_select = on_select
         self._on_cancel = on_cancel
         self._title = title
@@ -64,19 +67,29 @@ class Menu:
         self._canvas.delete(self._tag)
 
     def move_up(self):
-        if not self._active:
+        if not self._active or not self._items:
             return
-        self._selected = max(0, self._selected - 1)
-        self._draw()
+        new = self._selected
+        while new > 0:
+            new -= 1
+            if self._items[new]["enabled"]:
+                self._selected = new
+                self._draw()
+                return
 
     def move_down(self):
-        if not self._active:
+        if not self._active or not self._items:
             return
-        self._selected = min(len(self._items) - 1, self._selected + 1)
-        self._draw()
+        new = self._selected
+        while new < len(self._items) - 1:
+            new += 1
+            if self._items[new]["enabled"]:
+                self._selected = new
+                self._draw()
+                return
 
     def confirm(self):
-        if not self._active:
+        if not self._active or not self._items:
             return
         item = self._items[self._selected]
         if not item["enabled"]:
@@ -96,7 +109,18 @@ class Menu:
         if 0 <= index < len(self._items):
             self._items[index]["enabled"] = enabled
             if self._active:
+                self._snap_to_enabled()
                 self._draw()
+
+    def _snap_to_enabled(self):
+        if not self._items:
+            return
+        if self._items[self._selected]["enabled"]:
+            return
+        for i in range(len(self._items)):
+            if self._items[i]["enabled"]:
+                self._selected = i
+                return
 
     def _draw(self):
         self._canvas.delete(self._tag)

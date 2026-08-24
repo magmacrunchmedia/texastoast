@@ -48,8 +48,7 @@ def check_tile_collision(
 
     # Check horizontal movement
     if velocity_x != 0:
-        test_x = next_x if velocity_x > 0 else next_x
-        col = int((test_x + w - 1) // ts) if velocity_x > 0 else int(test_x // ts)
+        col = int((next_x + w - 1) // ts) if velocity_x > 0 else int(next_x // ts)
         start_row = int(y // ts)
         end_row = int((y + h - 1) // ts)
         blocked = False
@@ -64,8 +63,7 @@ def check_tile_collision(
 
     # Check vertical movement
     if velocity_y != 0:
-        test_y = next_y if velocity_y > 0 else next_y
-        row = int((test_y + h - 1) // ts) if velocity_y > 0 else int(test_y // ts)
+        row = int((next_y + h - 1) // ts) if velocity_y > 0 else int(next_y // ts)
         start_col = int(corrected_x // ts)
         end_col = int((corrected_x + w - 1) // ts)
         blocked = False

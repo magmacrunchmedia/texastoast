@@ -27,6 +27,8 @@ def test_input_state_dy():
     assert s.dy == -1.0
     s = InputState(down=True)
     assert s.dy == 1.0
+    s = InputState(up=True, down=True)
+    assert s.dy == 0.0
 
 
 def test_input_state_is_any_direction():
