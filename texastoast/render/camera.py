@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from dataclasses import dataclass
 
 # ``smoothing`` was calibrated as a per-frame lerp factor at this rate, so it
@@ -25,7 +26,19 @@ class Camera:
         ``smoothing`` is then a per-frame factor *at 30 fps*, converted to a
         time constant, so the camera lags by the same distance at any fps.
         Omitting ``dt`` keeps the old per-frame behaviour.
+
+        .. deprecated:: 0.4.0
+            Calling without ``dt`` is deprecated; 0.5.0 will require it. The
+            no-``dt`` path makes the camera converge twice as fast at 60 fps
+            as at 30.
         """
+        if dt is None:
+            warnings.warn(
+                "Camera.follow() without dt is frame-rate dependent and will "
+                "require dt in texastoast 0.5.0 — pass the frame's dt.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         target_cx = target_x - self.width / 2
         target_cy = target_y - self.height / 2
 

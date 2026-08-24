@@ -1,32 +1,38 @@
 from __future__ import annotations
 
-import tkinter as tk
 from collections.abc import Callable
+
+from texastoast.render.abstract import as_ui_surface
 
 
 class Menu:
-    """Canvas-based selectable menu with keyboard/controller navigation.
+    """Selectable menu with keyboard/controller navigation.
 
     Drawing is frame-driven, like :class:`~texastoast.ui.hud.HUD`: call
     :meth:`render` from the game's render function. A renderer that clears the
     canvas each frame would otherwise wipe the menu off screen while the menu
     still believes it is up.
+
+    ``surface`` accepts a :class:`~texastoast.render.canvas.CanvasRenderer`
+    (or any :class:`~texastoast.render.abstract.UISurface`) — in which case
+    ``width``/``height`` default from it — or a bare ``tk.Canvas`` for
+    backward compatibility.
     """
 
     def __init__(
         self,
-        canvas: tk.Canvas,
-        width: int = 640,
-        height: int = 480,
+        surface,
+        width: int | None = None,
+        height: int | None = None,
         font: tuple = ("Courier", 14),
         selected_color: str = "#e94560",
         normal_color: str = "#ffffff",
         disabled_color: str = "#555555",
         item_padding: int = 8,
     ):
-        self._canvas = canvas
-        self._width = width
-        self._height = height
+        self._surface = as_ui_surface(surface, width, height)
+        self._width = width if width is not None else self._surface.width
+        self._height = height if height is not None else self._surface.height
         self._font = font
         self._selected_color = selected_color
         self._normal_color = normal_color
@@ -69,7 +75,7 @@ class Menu:
 
     def hide(self):
         self._active = False
-        self._canvas.delete(self._tag)
+        self._surface.clear_group(self._tag)
 
     def move_up(self):
         if not self._active or not self._items:
@@ -126,7 +132,7 @@ class Menu:
 
     def render(self):
         """Draw the menu. Safe to call every frame, active or not."""
-        self._canvas.delete(self._tag)
+        self._surface.begin_group(self._tag)
         if not self._active:
             return
 
@@ -143,17 +149,20 @@ class Menu:
         x2 = cx + menu_width / 2
         y2 = cy + total_h / 2
 
-        self._canvas.create_rectangle(x1 - 4, y1 - 4, x2 + 4, y2 + 4,
-                                      fill="#000000", outline="#ffffff",
-                                      width=2, tags=self._tag)
+        self._surface.ui_rect(
+            x1 - 4, y1 - 4, (x2 + 4) - (x1 - 4), (y2 + 4) - (y1 - 4),
+            fill="#000000", outline="#ffffff", outline_width=2,
+            group=self._tag,
+        )
 
         y = y1 + self._item_padding
 
         if self._title:
-            self._canvas.create_text(
-                cx, y + 10, text=self._title,
+            self._surface.ui_text(
+                cx, y + 10, self._title,
                 fill=self._normal_color, font=("Courier", 11, "bold"),
-                tags=self._tag,
+                anchor="center",
+                group=self._tag,
             )
             y += 28
 
@@ -162,10 +171,10 @@ class Menu:
             is_enabled = item["enabled"]
 
             if is_selected and is_enabled:
-                self._canvas.create_rectangle(
-                    x1 + 4, y, x2 - 4, y + item_height,
-                    fill="#331111", outline="",
-                    tags=self._tag,
+                self._surface.ui_rect(
+                    x1 + 4, y, (x2 - 4) - (x1 + 4), item_height,
+                    fill="#331111",
+                    group=self._tag,
                 )
                 color = self._selected_color
                 prefix = "> "
@@ -173,10 +182,10 @@ class Menu:
                 color = self._normal_color if is_enabled else self._disabled_color
                 prefix = "  "
 
-            self._canvas.create_text(
+            self._surface.ui_text(
                 x1 + self._item_padding + 8, y + item_height / 2,
-                text=prefix + item["label"], fill=color,
-                font=self._font, anchor=tk.W,
-                tags=self._tag,
+                prefix + item["label"], fill=color,
+                font=self._font, anchor="w",
+                group=self._tag,
             )
             y += item_height

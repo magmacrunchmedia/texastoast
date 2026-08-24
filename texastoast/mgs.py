@@ -31,7 +31,13 @@ from __future__ import annotations
 from typing import Any
 
 from texastoast.core.game import Game
+from texastoast.i2c.bus import I2CBus
+from texastoast.i2c.hub import MagmaHub
+from texastoast.i2c.poller import HubPoller
+from texastoast.i2c.sim import simulated_hub
 from texastoast.input.keyboard import KeyboardInput
+from texastoast.input.magma_hub import CompositeInput, MagmaHubInput
+from texastoast.input.recording import InputRecorder, ReplayInput
 from texastoast.render.canvas import CanvasRenderer
 from texastoast.ui.dialogue import DialogueBox
 from texastoast.ui.hud import HUD
@@ -132,42 +138,115 @@ class TexastoastDomain:
         )
 
     # ── ui ──────────────────────────────────────────────────────────
+    # Each accepts a Game (draws on its canvas, pre-0.4 style) or a renderer
+    # (any UISurface): with a renderer, width/height default from it instead
+    # of being repeated by hand.
 
-    def dialogue(self, game: Game, opts: dict | None = None) -> DialogueBox:
+    @staticmethod
+    def _surface_of(target: Any) -> Any:
+        return target if hasattr(target, "ui_rect") else target.canvas
+
+    def dialogue(self, game: Any, opts: dict | None = None) -> DialogueBox:
         o = _options(opts, {
-            "width": 640, "height": 480, "box_height": 100,
+            "width": None, "height": None, "box_height": 100,
             "padding": 12, "speed": 0.03,
         }, "texastoast.dialogue()")
         return DialogueBox(
-            game.canvas,
-            width=int(o["width"]), height=int(o["height"]),
+            self._surface_of(game),
+            width=None if o["width"] is None else int(o["width"]),
+            height=None if o["height"] is None else int(o["height"]),
             box_height=int(o["box_height"]), padding=int(o["padding"]),
             speed=float(o["speed"]),
         )
 
-    def menu(self, game: Game, opts: dict | None = None) -> Menu:
+    def menu(self, game: Any, opts: dict | None = None) -> Menu:
         o = _options(opts, {
-            "width": 640, "height": 480,
+            "width": None, "height": None,
             "selected_color": "#e94560", "normal_color": "#ffffff",
             "disabled_color": "#555555", "item_padding": 8,
         }, "texastoast.menu()")
         return Menu(
-            game.canvas,
-            width=int(o["width"]), height=int(o["height"]),
+            self._surface_of(game),
+            width=None if o["width"] is None else int(o["width"]),
+            height=None if o["height"] is None else int(o["height"]),
             selected_color=str(o["selected_color"]),
             normal_color=str(o["normal_color"]),
             disabled_color=str(o["disabled_color"]),
             item_padding=int(o["item_padding"]),
         )
 
-    def hud(self, game: Game, opts: dict | None = None) -> HUD:
-        o = _options(opts, {"width": 640, "height": 480, "padding": 8},
+    def hud(self, game: Any, opts: dict | None = None) -> HUD:
+        o = _options(opts, {"width": None, "height": None, "padding": 8},
                      "texastoast.hud()")
         return HUD(
-            game.canvas,
-            width=int(o["width"]), height=int(o["height"]),
+            self._surface_of(game),
+            width=None if o["width"] is None else int(o["width"]),
+            height=None if o["height"] is None else int(o["height"]),
             padding=int(o["padding"]),
         )
+
+    # ── hardware ────────────────────────────────────────────────────
+    # The dev-kit workflows, scriptable: real hubs, simulated hubs,
+    # background polling, and record/replay.
+
+    def hub(self, opts: dict | None = None) -> MagmaHub:
+        o = _options(opts, {
+            "address": 0x08, "bus": 1, "controllers": 1, "poll_interval": 0.016,
+        }, "texastoast.hub()")
+        return MagmaHub(
+            int(o["address"]),
+            I2CBus(int(o["bus"])),
+            num_controllers=int(o["controllers"]),
+            poll_interval=float(o["poll_interval"]),
+        )
+
+    def hubs(self, opts: dict | None = None) -> list:
+        o = _options(opts, {
+            "buses": None, "addresses": None, "controllers": 1,
+        }, "texastoast.hubs()")
+        buses = None if o["buses"] is None else [int(_num(b)) for b in o["buses"]]
+        addresses = (None if o["addresses"] is None
+                     else [int(_num(a)) for a in o["addresses"]])
+        return MagmaHub.scan_buses(
+            bus_numbers=buses, addresses=addresses,
+            num_controllers=int(o["controllers"]),
+        )
+
+    def sim_hub(self, opts: dict | None = None) -> MagmaHub:
+        """A simulated hub. The SimBus is reachable as ``hub.sim`` so scripts
+        can drive it: ``h.sim.set_buttons(8, 0, 16)``."""
+        o = _options(opts, {"address": 0x08, "controllers": 1},
+                     "texastoast.sim_hub()")
+        hub, sim = simulated_hub(
+            num_controllers=int(o["controllers"]), address=int(o["address"]),
+        )
+        hub.sim = sim
+        return hub
+
+    def hub_input(self, hub: Any, index: int = 0) -> MagmaHubInput:
+        return MagmaHubInput(hub, controller_index=int(_num(index)))
+
+    def composite(self, keyboard: Any = None,
+                  hub_input: Any = None) -> CompositeInput:
+        return CompositeInput(keyboard, hub_input)
+
+    def poller(self, hub: Any, opts: dict | None = None) -> HubPoller:
+        """A background poller for ``hub``. Started unless ``start`` is False;
+        wire ``g.on_close(p.stop)`` yourself — the engine provides the pieces,
+        the script wires them together."""
+        o = _options(opts, {"poll_interval": 0.008, "start": True},
+                     "texastoast.poller()")
+        p = HubPoller(hub, poll_interval=float(o["poll_interval"]))
+        if o["start"]:
+            p.start()
+        return p
+
+    def recorder(self, source: Any, path: Any = None) -> InputRecorder:
+        return InputRecorder(source, path=None if path is None else str(path))
+
+    def replay(self, path: Any, opts: dict | None = None) -> ReplayInput:
+        o = _options(opts, {"loop": False}, "texastoast.replay()")
+        return ReplayInput(str(path), loop=bool(o["loop"]))
 
     def version(self) -> str:
         from texastoast import __version__

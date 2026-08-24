@@ -20,13 +20,24 @@ except ImportError:
 
 
 class I2CBus:
-    """Wrapper around smbus2 with error handling and mock fallback."""
+    """Wrapper around smbus2 with error handling and mock fallback.
 
-    def __init__(self, bus_number: int = 1):
+    ``backend`` accepts any object with the smbus2 surface this class uses
+    (``read_byte``, ``read_byte_data``, ``write_byte_data``,
+    ``read_i2c_block_data``, ``write_i2c_block_data``, ``close``) — e.g. a
+    :class:`~texastoast.i2c.sim.SimBus`. A bus with an injected backend is a
+    *real* bus to every caller: ``is_mock`` stays False and reads flow through,
+    which is what lets the whole hub/protocol stack run against a simulator.
+    """
+
+    def __init__(self, bus_number: int = 1, backend: object | None = None):
         self._bus_number = bus_number
-        self._bus: object | None = None
-        self._mock = not HAS_SMBUS
-        self._open()
+        self._bus: object | None = backend
+        if backend is not None:
+            self._mock = False
+        else:
+            self._mock = not HAS_SMBUS
+            self._open()
 
     def _open(self):
         if self._mock:
@@ -96,17 +107,29 @@ class I2CBus:
         except OSError as e:
             logger.debug(f"I2C block write error at 0x{address:02x}: {e}")
 
+    def probe(self, address: int) -> bool:
+        """Whether a device answers at ``address``. One read, no sweep."""
+        if self._mock:
+            return False
+        try:
+            self._bus.read_byte(address)
+            return True
+        except OSError:
+            return False
+
     def scan(self, start: int = 0x03, end: int = 0x77) -> list[int]:
-        """Scan I2C bus for devices. Returns list of responding addresses."""
+        """Scan I2C bus for devices. Returns list of responding addresses.
+
+        This probes every address in the range — 117 blocking reads by
+        default — so it belongs in diagnostics, not on a game's startup path.
+        Use :meth:`probe` for known candidate addresses instead.
+        """
         if self._mock:
             return []
         found = []
         for addr in range(start, end + 1):
-            try:
-                self._bus.read_byte(addr)
+            if self.probe(addr):
                 found.append(addr)
-            except OSError:
-                pass
         return found
 
     def close(self):

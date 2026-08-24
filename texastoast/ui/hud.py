@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import tkinter as tk
 from dataclasses import dataclass
+
+from texastoast.render.abstract import as_ui_surface
 
 
 @dataclass
@@ -15,19 +16,25 @@ class HUDStat:
 
 
 class HUD:
-    """Canvas-based heads-up display overlay for score, health, etc."""
+    """Heads-up display overlay for score, health, etc.
+
+    ``surface`` accepts a :class:`~texastoast.render.canvas.CanvasRenderer`
+    (or any :class:`~texastoast.render.abstract.UISurface`) — in which case
+    ``width``/``height`` default from it — or a bare ``tk.Canvas`` for
+    backward compatibility.
+    """
 
     def __init__(
         self,
-        canvas: tk.Canvas,
-        width: int = 640,
-        height: int = 480,
+        surface,
+        width: int | None = None,
+        height: int | None = None,
         font: tuple = ("Courier", 10),
         padding: int = 8,
     ):
-        self._canvas = canvas
-        self._width = width
-        self._height = height
+        self._surface = as_ui_surface(surface, width, height)
+        self._width = width if width is not None else self._surface.width
+        self._height = height if height is not None else self._surface.height
         self._font = font
         self._padding = padding
         self._tag = "hud"
@@ -45,7 +52,7 @@ class HUD:
             self._stats[key].value = max(0, min(value, self._stats[key].max_value))
 
     def add_text(self, key: str, text: str, x: float, y: float, **kwargs):
-        defaults = {"fill": "#ffffff", "font": self._font, "anchor": tk.NW}
+        defaults = {"fill": "#ffffff", "font": self._font, "anchor": "nw"}
         defaults.update(kwargs)
         self._custom_texts[key] = (text, x, y, defaults)
 
@@ -60,10 +67,10 @@ class HUD:
     def clear(self):
         self._stats.clear()
         self._custom_texts.clear()
-        self._canvas.delete(self._tag)
+        self._surface.clear_group(self._tag)
 
     def render(self):
-        self._canvas.delete(self._tag)
+        self._surface.begin_group(self._tag)
         self._render_stats()
         self._render_texts()
 
@@ -76,36 +83,43 @@ class HUD:
 
         for stat in self._stats.values():
             if stat.show_text:
-                self._canvas.create_text(
-                    x, y, text=stat.label, fill="#cccccc",
-                    font=self._font, anchor=tk.NW,
-                    tags=self._tag,
+                self._surface.ui_text(
+                    x, y, stat.label, fill="#cccccc",
+                    font=self._font, anchor="nw",
+                    group=self._tag,
                 )
                 value_text = f"{int(stat.value)}/{int(stat.max_value)}"
-                self._canvas.create_text(
-                    x + bar_width + 8, y, text=value_text, fill="#aaaaaa",
-                    font=self._font, anchor=tk.NW,
-                    tags=self._tag,
+                self._surface.ui_text(
+                    x + bar_width + 8, y, value_text, fill="#aaaaaa",
+                    font=self._font, anchor="nw",
+                    group=self._tag,
                 )
 
             if stat.show_bar:
                 bar_x = x
                 bar_y = y + (14 if stat.show_text else 0)
                 ratio = stat.value / stat.max_value if stat.max_value > 0 else 0
-                self._canvas.create_rectangle(
-                    bar_x, bar_y, bar_x + bar_width, bar_y + bar_height,
-                    fill="#333333", outline="#555555",
-                    tags=self._tag,
+                self._surface.ui_rect(
+                    bar_x, bar_y, bar_width, bar_height,
+                    fill="#333333", outline="#555555", outline_width=1,
+                    group=self._tag,
                 )
                 if ratio > 0:
-                    self._canvas.create_rectangle(
-                        bar_x, bar_y, bar_x + bar_width * ratio, bar_y + bar_height,
-                        fill=stat.color, outline="",
-                        tags=self._tag,
+                    self._surface.ui_rect(
+                        bar_x, bar_y, bar_width * ratio, bar_height,
+                        fill=stat.color,
+                        group=self._tag,
                     )
 
             y += line_height + (bar_height + 4 if stat.show_bar else 0)
 
     def _render_texts(self):
         for text, x, y, opts in self._custom_texts.values():
-            self._canvas.create_text(x, y, text=text, tags=self._tag, **opts)
+            self._surface.ui_text(
+                x, y, text,
+                fill=opts.get("fill", "#ffffff"),
+                font=opts.get("font", self._font),
+                anchor=str(opts.get("anchor", "nw")),
+                width=opts.get("width"),
+                group=self._tag,
+            )

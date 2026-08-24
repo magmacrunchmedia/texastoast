@@ -7,7 +7,14 @@ from texastoast.render.camera import Camera
 
 
 class CanvasRenderer:
-    """Renders tiles, sprites, and layers onto a tkinter Canvas."""
+    """Renders tiles, sprites, and layers onto a tkinter Canvas.
+
+    Satisfies both :class:`~texastoast.render.abstract.Renderer` (world-space
+    drawing) and :class:`~texastoast.render.abstract.UISurface` (screen-space
+    widget drawing) — structurally, no inheritance. UI widgets can therefore
+    take the renderer directly instead of a bare canvas plus their own copy
+    of the window size.
+    """
 
     def __init__(self, canvas: tk.Canvas, width: int, height: int):
         self._canvas = canvas
@@ -23,8 +30,24 @@ class CanvasRenderer:
     def camera(self) -> Camera:
         return self._camera
 
+    @property
+    def width(self) -> int:
+        return self._width
+
+    @property
+    def height(self) -> int:
+        return self._height
+
     def clear(self):
         self._canvas.delete("all")
+
+    def present(self):
+        """No-op on tkinter — the Canvas is retained-mode.
+
+        Call it at the end of your render function anyway: a buffered backend
+        (SDL, framebuffer) flips its off-screen buffer here, and that habit
+        cannot be retrofitted later without touching every game.
+        """
 
     def draw_tilemap(self, tilemap, tile_colors: dict[int, str],
                      skip_tiles: Iterable[int] | None = None):
@@ -81,3 +104,32 @@ class CanvasRenderer:
         defaults = {"fill": "#ffffff", "anchor": "nw", "font": ("Courier", 10)}
         defaults.update(kwargs)
         self._canvas.create_text(x, y, text=text, **defaults)
+
+    # ── UISurface ───────────────────────────────────────────────────
+    # Screen-space widget drawing. A "group" maps onto a canvas tag here:
+    # each widget owns one group and clears only that, so widgets compose
+    # over a renderer that wipes the whole canvas each frame.
+
+    def begin_group(self, group: str):
+        self._canvas.delete(group)
+
+    def clear_group(self, group: str):
+        self._canvas.delete(group)
+
+    def ui_rect(self, x: float, y: float, w: float, h: float, *,
+                fill: str, outline: str = "", outline_width: int = 0,
+                group: str = ""):
+        self._canvas.create_rectangle(
+            x, y, x + w, y + h,
+            fill=fill, outline=outline, width=outline_width, tags=group,
+        )
+
+    def ui_text(self, x: float, y: float, text: str, *,
+                fill: str, font=None, anchor: str = "nw",
+                width: float | None = None, group: str = ""):
+        kwargs = {"text": text, "fill": fill, "anchor": anchor, "tags": group}
+        if font is not None:
+            kwargs["font"] = font
+        if width is not None:
+            kwargs["width"] = width
+        self._canvas.create_text(x, y, **kwargs)

@@ -1,6 +1,8 @@
+from texastoast.render.abstract import Renderer, UISurface
 from texastoast.render.camera import Camera
 
-__all__ = ["CanvasRenderer", "Camera", "SpriteSheet", "load_image"]
+__all__ = ["CanvasRenderer", "Camera", "SpriteSheet", "load_image",
+           "Renderer", "UISurface"]
 
 
 def __getattr__(name):

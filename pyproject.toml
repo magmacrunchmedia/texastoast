@@ -34,6 +34,10 @@ classifiers = [
 texastoast = "texastoast.mgs:TexastoastDomain"
 tt = "texastoast.mgs:TexastoastDomain"
 
+# In the package (not tools/) so a pip install on the Pi gets it too.
+[project.scripts]
+texastoast-bench = "texastoast.devtools.bench:main"
+
 [project.urls]
 Homepage = "https://github.com/magmacrunchmedia/texastoast"
 Source = "https://github.com/magmacrunchmedia/texastoast"

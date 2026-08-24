@@ -16,6 +16,7 @@ button/joystick bytes from the Magma Hub.
 
 from texastoast import CanvasRenderer, Game, KeyboardInput
 from texastoast.i2c import I2CBus, MagmaHub
+from texastoast.i2c.poller import HubPoller
 from texastoast.input.magma_hub import CompositeInput, MagmaHubInput
 
 # ── Setup ───────────────────────────────────────────────────────────
@@ -24,7 +25,8 @@ game = Game(title="magma hub demo", width=320, height=240, fps=30)
 renderer = CanvasRenderer(game.canvas, 320, 240)
 keyboard = KeyboardInput(game.root)
 
-# Try to find a Magma Hub on I2C bus 1
+# Try to find a Magma Hub on I2C bus 1. scan_buses probes only the four
+# candidate hub addresses, so this is quick even on a real bus.
 hub = None
 bus = I2CBus(1)
 if not bus.is_mock:
@@ -37,7 +39,15 @@ if not bus.is_mock:
 else:
     print("I2C not available — using keyboard only")
 
-hub_input = MagmaHubInput(hub, controller_index=0) if hub else None
+# Poll the hub on a background thread so a slow or flaky wire never stalls a
+# frame; the poller has the hub's read surface, so MagmaHubInput can't tell
+# the difference. One poller per hub OR direct hub.poll() calls — never both.
+if hub:
+    poller = HubPoller(hub).start()
+    game.on_close(poller.stop)
+    hub_input = MagmaHubInput(poller, controller_index=0)
+else:
+    hub_input = None
 controls = CompositeInput(keyboard, hub_input)
 
 # ── Player ──────────────────────────────────────────────────────────

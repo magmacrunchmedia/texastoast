@@ -127,3 +127,34 @@ def test_composite_input_no_hub():
     state = composite.poll()
     assert state.up is False
     assert composite.is_pressed("a") is False
+
+
+def test_hub_stats_start_empty():
+    bus = I2CBus(99)
+    hub = MagmaHub(0x08, bus, num_controllers=1)
+    stats = hub.stats
+    assert stats.poll_count == 0
+    assert stats.error_count == 0
+    assert stats.avg_duration == 0.0
+    assert stats.jitter == 0.0
+
+
+def test_hub_poll_counts_and_measures():
+    bus = I2CBus(99)
+    hub = MagmaHub(0x08, bus, num_controllers=1, poll_interval=0.0)
+    hub.poll()
+    hub.poll()
+    stats = hub.stats
+    assert stats.poll_count == 2
+    # Mock reads are failures — each poll counts one error per controller.
+    assert stats.error_count == 2
+
+
+def test_hub_poll_returns_a_fresh_snapshot():
+    # Threaded readers (HubPoller) rely on poll() swapping in a new list
+    # rather than mutating the old one mid-read.
+    bus = I2CBus(99)
+    hub = MagmaHub(0x08, bus, num_controllers=2, poll_interval=0.0)
+    first = hub.poll()
+    second = hub.poll()
+    assert first is not second

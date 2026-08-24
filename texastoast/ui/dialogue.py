@@ -1,31 +1,37 @@
 from __future__ import annotations
 
-import tkinter as tk
 from collections.abc import Callable
+
+from texastoast.render.abstract import as_ui_surface
 
 
 class DialogueBox:
-    """Canvas-based dialogue box with typewriter text and portrait support.
+    """Dialogue box with typewriter text and portrait support.
 
     Drawing is frame-driven, like :class:`~texastoast.ui.hud.HUD`: call
     :meth:`update` from the game's update function and :meth:`render` from its
     render function. A renderer that clears the canvas each frame would
     otherwise wipe the box off screen while the box still believes it is up.
+
+    ``surface`` accepts a :class:`~texastoast.render.canvas.CanvasRenderer`
+    (or any :class:`~texastoast.render.abstract.UISurface`) — in which case
+    ``width``/``height`` default from it — or a bare ``tk.Canvas`` for
+    backward compatibility.
     """
 
     def __init__(
         self,
-        canvas: tk.Canvas,
-        width: int = 640,
-        height: int = 480,
+        surface,
+        width: int | None = None,
+        height: int | None = None,
         box_height: int = 100,
         padding: int = 12,
         font: tuple = ("Courier", 12),
         speed: float = 0.03,
     ):
-        self._canvas = canvas
-        self._width = width
-        self._height = height
+        self._surface = as_ui_surface(surface, width, height)
+        self._width = width if width is not None else self._surface.width
+        self._height = height if height is not None else self._surface.height
         self._box_height = box_height
         self._padding = padding
         self._font = font
@@ -94,7 +100,7 @@ class DialogueBox:
 
     def render(self):
         """Draw the box. Safe to call every frame, active or not."""
-        self._canvas.delete(self._tag)
+        self._surface.begin_group(self._tag)
         if not self._active:
             return
 
@@ -103,37 +109,39 @@ class DialogueBox:
         x2 = self._width - self._padding
         y2 = self._height - self._padding
 
-        self._canvas.create_rectangle(x1, y1, x2, y2,
-                                      fill="#000000", outline="#ffffff",
-                                      width=2, tags=self._tag)
+        self._surface.ui_rect(
+            x1, y1, x2 - x1, y2 - y1,
+            fill="#000000", outline="#ffffff", outline_width=2,
+            group=self._tag,
+        )
 
         if self._speaker:
-            self._canvas.create_text(
+            self._surface.ui_text(
                 x1 + self._padding, y1 + 4,
-                text=self._speaker, fill="#e94560",
-                font=("Courier", 10, "bold"), anchor=tk.NW,
-                tags=self._tag,
+                self._speaker, fill="#e94560",
+                font=("Courier", 10, "bold"), anchor="nw",
+                group=self._tag,
             )
 
         text_x = x1 + self._padding
         text_y = y1 + (self._padding + 28 if self._speaker else self._padding + 14)
 
-        self._canvas.create_text(
+        self._surface.ui_text(
             text_x, text_y,
-            text=self.displayed, fill="#ffffff",
-            font=self._font, anchor=tk.NW,
+            self.displayed, fill="#ffffff",
+            font=self._font, anchor="nw",
             width=self._width - self._padding * 4,
-            tags=self._tag,
+            group=self._tag,
         )
 
         if self._waiting:
-            self._canvas.create_text(
+            self._surface.ui_text(
                 self._width - self._padding * 2,
                 self._height - self._padding * 2,
-                text="[A] continue", fill="#aaaaaa",
-                font=("Courier", 9), anchor=tk.SE,
-                tags=self._tag,
+                "[A] continue", fill="#aaaaaa",
+                font=("Courier", 9), anchor="se",
+                group=self._tag,
             )
 
     def _clear(self):
-        self._canvas.delete(self._tag)
+        self._surface.clear_group(self._tag)

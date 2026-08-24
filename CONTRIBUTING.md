@@ -46,6 +46,13 @@ CI runs `ruff check .` and fails on any finding.
   valid zero data. Return `None`, do not fabricate a zero buffer.
 - Every bug fix gets a regression test that fails against the old behavior, with
   a comment naming what used to go wrong.
+- Hardware code paths must be testable with no I2C and no display — test them
+  through `SimBus` (`texastoast.i2c.sim`), which runs the real bus/hub/protocol
+  code. Do not add tests that require a physical hub; the Pi checklist in the
+  README is the manual gate for that.
+- `texastoast/devtools/` ships in the wheel and may import tkinter only inside
+  functions, never at module import time — the package must stay importable on
+  headless systems.
 
 ## Releasing
 
@@ -58,7 +65,7 @@ Publishing. There is no API token and no repository secret to manage.
 3. Commit, then tag:
 
    ```bash
-   git tag v0.2.0 && git push origin main --tags
+   git tag v0.4.0 && git push origin main --tags
    ```
 
 4. The release workflow builds the sdist and wheel, verifies the tag matches

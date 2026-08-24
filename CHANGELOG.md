@@ -5,6 +5,81 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-08-24
+
+The hardware dev-kit release. The premise: **you should not need the hardware
+to build for the hardware.** Everything the I2C layer does — the protocol
+handshake, hub polling, input adapters — now runs against a simulator, gets
+watched by a live test bench, and records/replays as regression files. Plus
+the first seam toward a non-tkinter rendering backend.
+
+### Added
+
+- **Hub simulator** (`texastoast.i2c.sim`). `SimBus` implements the smbus2
+  surface, injected via the new `I2CBus(backend=...)` parameter — so a
+  simulated bus is a *real* bus to every caller, and every test of it
+  exercises the actual `MagmaHub` protocol code. Faked at the bus level, not
+  the hub level, deliberately: a hub-level fake could never catch a protocol
+  regression (the 0.3.0 `connected` bug would have sailed through one). The
+  sim is strict about the firmware handshake — a block read with no preceding
+  select-write raises, exactly as the Pico refuses it. Includes error
+  injection (`fail_next_reads`), latency simulation (`set_read_delay`),
+  hotplug (`disconnect_hub`), `simulated_hub()` one-line wiring, and
+  `KeyboardHubDriver` (the keyboard as a simulated controller).
+- **Controller test bench** — `texastoast-bench`, the package's first console
+  script. Live button/joystick display, raw protocol bytes, connection
+  status, poll-latency stats and read-error rates per hub; simulator mode
+  (automatic when no hub answers, or `--sim`) and `--record`. It lives in
+  `texastoast/devtools/`, not `tools/`, because `tools/` ships only in the
+  sdist and the Pi that needs the bench installed from a wheel.
+- **Input recording & replay** (`texastoast.input.recording`). `.ttrec` is
+  delta-encoded JSON Lines of *protocol button bitmasks* — that one choice
+  lets a single recording replay through the engine (`ReplayInput`, an
+  `InputSource` with a wall clock or a deterministic manual clock) *and*
+  through the full hardware stack (`SimBus.play_recording` feeds the raw
+  bytes back in). A session recorded against real firmware becomes a
+  regression test that runs anywhere.
+- **Background polling** (`texastoast.i2c.poller`). `HubPoller` polls on a
+  daemon thread and duck-types the hub's read surface, so `MagmaHubInput`
+  works unchanged and `poll()` never blocks a frame on a loose wire. The
+  handoff is an atomic swap of an immutable snapshot — no locks on the hot
+  path. `scan_buses_async` does discovery off-thread. One poller per hub *or*
+  direct polling, never both.
+- **`MagmaHub.stats`** — `HubStats` with poll/error counts and rolling
+  latency min/avg/max/jitter, for the bench and for any game that wants a
+  connection-quality indicator.
+- **Renderer protocols** (`texastoast.render.abstract`). `Renderer`
+  (world-space) and `UISurface` (screen-space, group-scoped) capture what the
+  engine asks of a drawing backend; `CanvasRenderer` satisfies both
+  structurally. `present()` is a documented no-op on tkinter — it exists now
+  because a buffered SDL/framebuffer backend cannot retrofit it later without
+  touching every game's render function. UI portraits/images through the
+  surface and theming are deliberately deferred.
+- **magmascript hardware factories** — `hub`, `hubs`, `sim_hub` (the SimBus
+  rides along as `h.sim`), `hub_input`, `composite`, `poller`, `recorder`,
+  `replay`; see `examples/sim_input.mgs`.
+
+### Changed
+
+- **UI widgets take the renderer** (any `UISurface`) in place of a bare
+  canvas, and inherit its dimensions — ending the width/height being passed
+  by hand to every widget separately. The bare-canvas form still works
+  unchanged.
+- **`MagmaHub.scan_buses()` probes only the candidate addresses** (four
+  reads) instead of sweeping 0x03–0x77 — 117 blocking reads had no place on a
+  game's startup path. `I2CBus.scan()` remains for diagnostics;
+  `I2CBus.probe(addr)` is the new single-address check.
+- **`MagmaHub.poll()` returns a fresh snapshot list** each poll instead of
+  mutating in place, so a threaded reader can never observe a half-updated
+  poll. Treat the returned list as read-only.
+
+### Deprecated
+
+- **`Camera.follow()` without `dt`** now warns; 0.5.0 will require it. The
+  no-`dt` path converges twice as fast at 60 fps as at 30 — flipping the
+  default silently would change every game's camera feel, so it warns for one
+  release instead.
+
 ## [0.3.0] — 2026-08-24
 
 A second correctness pass, over the parts 0.2.0 did not reach — the UI widgets

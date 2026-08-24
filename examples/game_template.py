@@ -58,9 +58,10 @@ LEVEL_1 = [
 game = Game(title="texastoast game template", width=SCREEN_W, height=SCREEN_H, fps=FPS)
 renderer = CanvasRenderer(game.canvas, SCREEN_W, SCREEN_H)
 keyboard = KeyboardInput(game.root)
-dialogue = DialogueBox(game.canvas, SCREEN_W, SCREEN_H)
-menu = Menu(game.canvas, SCREEN_W, SCREEN_H)
-hud = HUD(game.canvas, SCREEN_W, SCREEN_H)
+# UI widgets take the renderer and inherit its dimensions.
+dialogue = DialogueBox(renderer)
+menu = Menu(renderer)
+hud = HUD(renderer)
 
 tilemap = TileMap(LEVEL_1, tile_size=TILE_SIZE, solid_tiles={1, 2})
 player = Entity(x=60, y=60, width=14, height=14, speed=PLAYER_SPEED)

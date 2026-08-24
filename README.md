@@ -72,6 +72,16 @@ game.start()
 - `move()` takes the frame's `dt`, so movement is frame-rate independent.
 - Diagonals are normalized: holding two directions is the same speed as one.
 
+## Upgrading from 0.3.x
+
+Nothing breaks. Two things are better:
+
+- UI widgets accept the renderer in place of `game.canvas` and inherit its
+  dimensions — `DialogueBox(renderer)` instead of
+  `DialogueBox(game.canvas, 640, 480)`. The old form still works.
+- `Camera.follow()` without `dt` now emits a `DeprecationWarning`; 0.5.0 will
+  require it. Pass the frame's `dt` (the examples always have).
+
 ## Upgrading from 0.2.x
 
 `DialogueBox` and `Menu` are now drawn by your render loop, like `HUD` always
@@ -119,7 +129,102 @@ package — clone the repo to run them.
 | `examples/game_template.py` | Full game starting point |
 | `examples/magma_hub_demo.py` | I2C controller input |
 | `examples/hello.mgs` | The same demo written in magmascript |
+| `examples/sim_input.mgs` | A simulated Magma Hub driving a game |
 | `tools/tile_editor.py` | Tile map editor GUI |
+| `tools/controller_bench.py` | Controller test bench (also `texastoast-bench`) |
+
+## Hardware dev kit
+
+You should not need the hardware to build for the hardware. Everything below
+runs the *real* I2C stack — protocol handshake, hub polling, input adapters —
+against a simulator when no bus is present.
+
+### Controller test bench
+
+```bash
+texastoast-bench            # scan for hubs; simulator mode if none found
+texastoast-bench --sim      # force the simulator (keyboard drives controller 0)
+texastoast-bench --record session.ttrec   # capture controller 0 while open
+```
+
+Live per-controller button/joystick display, raw protocol bytes, connection
+status, poll-latency stats (min/avg/max/jitter) and read-error rates. Open it
+while probing wiring or iterating on hub firmware.
+
+### Hub simulator
+
+`SimBus` implements the smbus2 surface, so a simulated bus is a real bus to
+every caller — and it enforces the firmware's select-write handshake, so it
+catches protocol regressions, not just byte mismatches.
+
+```python
+from texastoast import simulated_hub
+from texastoast.i2c.protocol import BTN_A
+
+hub, sim = simulated_hub()          # a real MagmaHub over a simulated bus
+sim.press(BTN_A)
+assert hub.poll()[0].a              # full stack, no wires
+
+sim.fail_next_reads(3)              # error injection: a loose wire, on demand
+sim.set_read_delay(0.05)            # latency simulation
+sim.disconnect_hub(0x08)            # hotplug simulation
+```
+
+### Background polling
+
+I2C reads block; a loose wire can turn one `poll()` into a frame hitch.
+`HubPoller` moves bus traffic onto a daemon thread and duck-types the hub's
+read surface, so `MagmaHubInput` can't tell the difference:
+
+```python
+from texastoast import HubPoller, MagmaHubInput
+
+poller = HubPoller(hub).start()
+game.on_close(poller.stop)                   # you wire the teardown
+pad = MagmaHubInput(poller)                  # poll() now never blocks
+poller.stats                                 # HubStats: latency, errors
+```
+
+One poller per hub *or* direct `hub.poll()` calls — never both.
+
+### Input recording & replay
+
+`.ttrec` files are delta-encoded JSON Lines of protocol button bitmasks, so
+one recording replays two ways: through the engine, or through the full
+hardware stack.
+
+```python
+from texastoast import InputRecorder, ReplayInput
+
+recorder = InputRecorder(controls, "session.ttrec")   # wraps any InputSource
+recorder.start()
+game.on_close(recorder.stop)
+
+replay = ReplayInput("session.ttrec")                 # is an InputSource
+replay.advance(dt)                                    # deterministic mode
+# or replay.start() for wall-clock playback
+
+driver = sim.play_recording("session.ttrec")          # firmware-shaped replay:
+driver.advance(dt)                                    # raw bytes → SimBus → MagmaHub
+```
+
+A session recorded against real firmware (`texastoast-bench --record`) becomes
+a regression test that runs anywhere.
+
+### Testing on the Pi
+
+CI covers all of the hardware *logic* through the simulator; the release gate
+for the `hardware` extra is a manual pass on a Raspberry Pi:
+
+1. `sudo raspi-config` → enable I2C; wire the hub; `i2cdetect -y 1` should
+   show it at `0x08`–`0x0b`.
+2. `pip install texastoast[hardware]` and run `texastoast-bench` — every
+   button lights, the joystick crosshair tracks, poll latency is steady
+   (sub-millisecond jitter on a healthy bus) and the error rate is 0/s.
+3. Record a session with `--record`, replay it through `ReplayInput`, and
+   keep the file — it is the firmware regression corpus.
+4. Run `examples/magma_hub_demo.py` and confirm hub input drives the square
+   and unplugging mid-game falls back to the keyboard.
 
 ## Documentation
 
@@ -229,12 +334,15 @@ Optional I2C support for connecting hardware controllers via Raspberry Pi.
 ```python
 from texastoast import I2CBus, MagmaHub, MagmaHubInput, CompositeInput
 
-# Direct I2C
+# Direct I2C — scan_buses probes only the candidate hub addresses (4 reads);
+# bus.scan() sweeps the whole range and is for diagnostics.
 bus = I2CBus(1)
+bus.probe(0x08)  # -> bool, one read
 hubs = MagmaHub.scan_buses(bus_numbers=[1])
 hub = hubs[0]
-hub.poll()       # -> [ControllerState, ...]
+hub.poll()       # -> [ControllerState, ...] (a fresh snapshot; don't mutate)
 hub.connected    # -> True only while reads are actually succeeding
+hub.stats        # -> HubStats: poll_count, error_count, latency min/avg/max
 
 # Input adapter (same interface as KeyboardInput)
 hub_input = MagmaHubInput(hub, controller_index=0)
@@ -245,6 +353,10 @@ controls = CompositeInput(keyboard, hub_input)
 state = controls.poll()  # uses hub if connected, else keyboard
 ```
 
+See [Hardware dev kit](#hardware-dev-kit) for the simulator (`SimBus`,
+`simulated_hub`), background polling (`HubPoller`, `scan_buses_async`) and
+input recording (`InputRecorder`, `ReplayInput`).
+
 Without `smbus2`, or with no bus present, `I2CBus` runs in mock mode: reads
 return `None` rather than fabricated zeros, `hub.connected` stays `False`, and
 `CompositeInput` falls through to the keyboard.
@@ -254,8 +366,11 @@ return `None` rather than fabricated zeros, `hub.connected` stays `False`, and
 ```python
 from texastoast.ui import DialogueBox, Menu, HUD
 
+# Widgets take the renderer (preferred — they inherit its dimensions) or a
+# bare canvas plus explicit width/height (the pre-0.4 form, still supported).
+
 # Dialogue
-dialogue = DialogueBox(game.canvas, 640, 480)
+dialogue = DialogueBox(renderer)
 dialogue.show("Hello, world!", speaker="NPC", on_complete=callback)
 dialogue.update(dt)   # from your update(); advances the typewriter
 dialogue.render()     # from your render(); safe to call when inactive
@@ -263,7 +378,7 @@ dialogue.dismiss()    # skip to the end, or close if already there
 dialogue.active, dialogue.waiting, dialogue.displayed
 
 # Menu
-menu = Menu(game.canvas, 640, 480)
+menu = Menu(renderer)
 menu.show(["Play", "Settings", "Quit"],
           on_select=lambda i, label: print(label),
           on_cancel=lambda: menu.hide())
@@ -273,7 +388,7 @@ menu.confirm()
 menu.render()         # from your render(); safe to call when inactive
 
 # HUD
-hud = HUD(game.canvas, 640, 480)
+hud = HUD(renderer)
 hud.add_stat("hp", "HP", value=100, max_value=100, color="#e94560")
 hud.set_stat("hp", 75)
 hud.add_text("score", "Score: 0", 10, 10, fill="#fdd835")
@@ -333,6 +448,14 @@ keyword-argument syntax; an unknown key is an error rather than a silent
 default. Everything else is the Python API unchanged — the objects a script
 holds are the same objects, so `player.x` reads and `player.speed = 200` writes
 go straight through.
+
+The hardware layer is scriptable too: `tt.hub()`, `tt.hubs()` (scan),
+`tt.sim_hub()` (simulator — the `SimBus` is reachable as `h.sim`),
+`tt.hub_input()`, `tt.composite()`, `tt.poller()` (background polling; wire
+`g.on_close(p.stop)` yourself), `tt.recorder()` and `tt.replay()`. See
+[examples/sim_input.mgs](examples/sim_input.mgs) for a simulated hub driving a
+game. UI factories accept the renderer in place of the game —
+`tt.dialogue(r)` — and then inherit its dimensions.
 
 Needs magmascript 3.2 or newer. See [examples/hello.mgs](examples/hello.mgs).
 

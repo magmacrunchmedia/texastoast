@@ -9,9 +9,10 @@ from texastoast.ui import HUD, DialogueBox, Menu
 game = Game(title="texastoast rpg demo", width=400, height=300, fps=30)
 renderer = CanvasRenderer(game.canvas, 400, 300)
 keyboard = KeyboardInput(game.root)
-dialogue = DialogueBox(game.canvas, 400, 300, speed=0.04)
-menu = Menu(game.canvas, 400, 300)
-hud = HUD(game.canvas, 400, 300)
+# Widgets take the renderer and inherit its dimensions — no repeating 400x300.
+dialogue = DialogueBox(renderer, speed=0.04)
+menu = Menu(renderer)
+hud = HUD(renderer)
 
 # ── Map ─────────────────────────────────────────────────────────────
 

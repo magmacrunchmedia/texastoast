@@ -1,0 +1,55 @@
+// The hardware workflow, with no hardware: a simulated Magma Hub drives the
+// square. Run it with:
+//     magmascript examples/sim_input.mgs
+//
+// tt.sim_hub() builds a real MagmaHub over a simulated I2C bus, and the
+// SimBus is reachable as `h.sim` — the script pokes controller state into it
+// exactly the way firmware would put bytes on the wire. Swap sim_hub() for
+// hub() and the same game runs against the real thing on a Pi.
+
+g = tt.game({"title": "simulated hub input", "width": 400, "height": 300, "fps": 30})
+r = tt.renderer(g, 400, 300)
+
+h = tt.sim_hub({"controllers": 1})
+pad = tt.hub_input(h, 0)
+
+player = tt.entity({"x": 190, "y": 140, "width": 14, "height": 14, "speed": 120})
+
+// Button bitmasks from the I2C protocol: up=1 down=2 left=4 right=8.
+// The "autopilot" writes them into the sim on a timer, like firmware would.
+t = 0
+
+update = fn(dt) {
+    t = t + dt
+    if t >= 4 {
+        t = t - 4
+    }
+
+    // Drive the simulated controller: circle through the d-pad.
+    if t < 1 {
+        h.sim.set_buttons(8, 0, 8)      // right
+    } else if t < 2 {
+        h.sim.set_buttons(8, 0, 2)      // down
+    } else if t < 3 {
+        h.sim.set_buttons(8, 0, 4)      // left
+    } else {
+        h.sim.set_buttons(8, 0, 1)      // up
+    }
+
+    // The game reads it back through the full real stack: SimBus → I2CBus →
+    // MagmaHub protocol → MagmaHubInput → InputState.
+    s = pad.poll()
+    player.move(s.dx, s.dy, dt)
+}
+
+render = fn() {
+    r.clear()
+    r.draw_rect(player.x, player.y, player.width, player.height, "#e94560")
+    r.present()
+}
+
+g.set_update(update)
+g.set_render(render)
+
+print("The square drives itself through a simulated Magma Hub at 0x08.")
+g.start()
