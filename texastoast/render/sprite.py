@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from typing import Optional
 
 try:
     from PIL import Image, ImageTk
@@ -23,8 +22,8 @@ class SpriteSheet:
         self._path = Path(path)
         self._frame_width = frame_width
         self._frame_height = frame_height
-        self._image: Optional[tk.PhotoImage] = None
-        self._pil_image: Optional[object] = None
+        self._image: tk.PhotoImage | None = None
+        self._pil_image: object | None = None
         self._frames: dict[tuple[int, int], tk.PhotoImage] = {}
         self._root = None
 
