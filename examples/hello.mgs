@@ -1,0 +1,50 @@
+// The .mgs twin of hello_world.py — run it with:
+//     magmascript examples/hello.mgs
+// Requires texastoast and magmascript installed in the same environment; the
+// domain is discovered through texastoast's entry point. `tt` is the short
+// name for it — `texastoast` is the same domain and works identically.
+
+g = tt.game({"title": "hello from magmascript", "width": 400, "height": 300, "fps": 30})
+r = tt.renderer(g, 400, 300)
+kb = tt.keyboard(g)
+
+// A list, not a set — MagmaScript has no set literal, and TileMap takes any
+// iterable of solid tile ids.
+world = tt.tilemap([
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+], 20, [1])
+
+player = tt.entity({"x": 40, "y": 30, "width": 14, "height": 14, "speed": 100})
+
+TILE_COLORS = {0: "#7cb342", 1: "#5d4037"}
+
+update = fn(dt) {
+    // `s.dx` and `s.dy` are properties over InputState's fields.
+    s = kb.poll()
+    player.move(s.dx, s.dy, dt, world)
+
+    // Hold the A button to sprint — an attribute write on a host object.
+    if s.a {
+        player.speed = 220
+    } else {
+        player.speed = 100
+    }
+
+    r.camera.follow(player.center_x, player.center_y, world.width, world.height, dt)
+}
+
+render = fn() {
+    r.clear()
+    r.draw_tilemap(world, TILE_COLORS)
+    r.draw_rect(player.x, player.y, player.width, player.height, "#e94560")
+}
+
+g.set_update(update)
+g.set_render(render)
+
+print("WASD or arrows to move, hold Z to sprint. Close the window to quit.")
+g.start()

@@ -5,7 +5,13 @@ from collections.abc import Callable
 
 
 class Menu:
-    """Canvas-based selectable menu with keyboard/controller navigation."""
+    """Canvas-based selectable menu with keyboard/controller navigation.
+
+    Drawing is frame-driven, like :class:`~texastoast.ui.hud.HUD`: call
+    :meth:`render` from the game's render function. A renderer that clears the
+    canvas each frame would otherwise wipe the menu off screen while the menu
+    still believes it is up.
+    """
 
     def __init__(
         self,
@@ -60,7 +66,6 @@ class Menu:
         self._on_cancel = on_cancel
         self._title = title
         self._active = True
-        self._draw()
 
     def hide(self):
         self._active = False
@@ -74,7 +79,6 @@ class Menu:
             new -= 1
             if self._items[new]["enabled"]:
                 self._selected = new
-                self._draw()
                 return
 
     def move_down(self):
@@ -85,7 +89,6 @@ class Menu:
             new += 1
             if self._items[new]["enabled"]:
                 self._selected = new
-                self._draw()
                 return
 
     def confirm(self):
@@ -110,7 +113,6 @@ class Menu:
             self._items[index]["enabled"] = enabled
             if self._active:
                 self._snap_to_enabled()
-                self._draw()
 
     def _snap_to_enabled(self):
         if not self._items:
@@ -122,8 +124,11 @@ class Menu:
                 self._selected = i
                 return
 
-    def _draw(self):
+    def render(self):
+        """Draw the menu. Safe to call every frame, active or not."""
         self._canvas.delete(self._tag)
+        if not self._active:
+            return
 
         menu_width = 280
         item_height = 32

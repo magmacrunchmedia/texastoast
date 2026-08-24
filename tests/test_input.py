@@ -1,4 +1,7 @@
+from conftest import requires_tk
+
 from texastoast.input.abstract import InputState
+from texastoast.input.keyboard import KeyboardInput
 
 
 def test_input_state_defaults():
@@ -38,3 +41,37 @@ def test_input_state_is_any_direction():
     assert s.is_any_direction() is True
     s = InputState(a=True)
     assert s.is_any_direction() is False
+
+
+@requires_tk
+def test_keys_sharing_a_button_do_not_release_each_other(tk_root):
+    """Up/w/W all map to `up`, Left/a/A all map to `left`.
+
+    Releasing one alias used to clear the button outright, so holding Left and
+    tapping `a` stopped the player mid-stride.
+    """
+    keyboard = KeyboardInput(tk_root)
+
+    keyboard._press("Left", "left")
+    keyboard._press("a", "left")
+    assert keyboard.poll().left is True
+
+    keyboard._release("a", "left")
+    assert keyboard.poll().left is True   # the arrow is still down
+
+    keyboard._release("Left", "left")
+    assert keyboard.poll().left is False
+
+
+@requires_tk
+def test_poll_returns_a_snapshot_not_the_live_state(tk_root):
+    """Edge detection needs the previous frame to stay put."""
+    keyboard = KeyboardInput(tk_root)
+
+    previous = keyboard.poll()
+    keyboard._press("z", "a")
+    current = keyboard.poll()
+
+    assert previous is not current
+    assert previous.a is False
+    assert current.a is True

@@ -97,7 +97,7 @@ def test_keyboard_destroy_can_be_registered_as_teardown(game):
 
 def test_keyboard_destroy_unbinds_and_resets_state(tk_root):
     keyboard = KeyboardInput(tk_root)
-    keyboard._set("up", True)
+    keyboard._press("Up", "up")
     assert keyboard.poll().up is True
 
     keyboard.destroy()

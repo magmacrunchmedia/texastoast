@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 
 from texastoast.i2c.hub import MagmaHub
 from texastoast.input.abstract import InputState
@@ -33,6 +34,7 @@ class MagmaHubInput:
         return self._hub.connected
 
     def poll(self) -> InputState:
+        """A snapshot of this controller's state. See :meth:`KeyboardInput.poll`."""
         controllers = self._hub.poll()
         if self._controller_index < len(controllers):
             cs = controllers[self._controller_index]
@@ -46,7 +48,11 @@ class MagmaHubInput:
                 start=cs.start,
                 select=cs.select,
             )
-        return self._state
+        else:
+            # The hub stopped reporting this controller. Keeping the last state
+            # would leave whatever was held at that moment stuck down forever.
+            self._state = InputState()
+        return replace(self._state)
 
     def is_pressed(self, button: str) -> bool:
         return getattr(self._state, button, False)
@@ -73,7 +79,7 @@ class CompositeInput:
             return self._hub_input.poll()
         if self._keyboard:
             return self._keyboard.poll()
-        return _IDLE
+        return replace(_IDLE)
 
     def is_pressed(self, button: str) -> bool:
         if self._hub_input and self._hub_input.connected:

@@ -5,6 +5,82 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-08-24
+
+A second correctness pass, over the parts 0.2.0 did not reach — the UI widgets
+and the camera — plus a scripting surface for
+[magmascript](https://github.com/magmacrunchmedia/magmascript).
+
+### Breaking
+
+- **`DialogueBox` and `Menu` are drawn by your render loop**, the way `HUD`
+  already was. Call `dialogue.update(dt)` from `update()` and
+  `dialogue.render()` / `menu.render()` from `render()`.
+
+  They previously drew themselves once from `show()`, and `DialogueBox` drove
+  its typewriter from its own `canvas.after()` timer. Any game whose renderer
+  clears the canvas each frame — including both shipped demos — had the box and
+  the pause menu wiped off screen while they still reported `active`, so input
+  stayed captured and the game looked frozen behind an invisible modal.
+
+  `DialogueBox._tick_type`, `_draw_box`, `_render_text` and `_cancel_pending`
+  are gone, along with the second timing source: the typewriter no longer runs
+  after the game loop stops, and it advances by `dt` rather than wall clock.
+  `Menu._draw()` is now `Menu.render()`.
+
+- **`KeyboardInput.poll()` and `MagmaHubInput.poll()` return a copy**, not the
+  live `InputState`. Keeping the previous frame's state to detect a fresh
+  button press silently could not work before, because every poll handed back
+  the same object. Code that mutated the returned state to inject input needs
+  to set the source's state instead.
+
+### Fixed
+
+- **Camera easing was frame-rate dependent.** `Camera.follow()` applied
+  `smoothing` once per frame, so the camera converged twice as fast at 60 fps
+  as at 30 — the same bug `Entity.move()` was fixed for in 0.2.0. `follow()`
+  now takes an optional `dt` and treats `smoothing` as a per-frame factor at
+  30 fps, converted to a time constant. Omitting `dt` keeps the old behaviour.
+- **Keys that share a button released each other.** `Up`, `w` and `W` all map
+  to `up`; releasing any one of them cleared the button. Holding `Left` and
+  tapping `a` stopped the player. Each button now tracks which keys are down.
+- **Hub input stuck when a controller disappeared.** `MagmaHubInput.poll()`
+  kept the last state when the hub stopped reporting that controller, leaving
+  whatever was held at that moment pressed forever. It now resets to idle.
+- **The game loop swallowed exceptions indefinitely.** A broken `update()`
+  printed a traceback every frame while the game appeared to run. The loop now
+  tolerates `max_consecutive_errors` (default 10) back-to-back failures, then
+  stops and re-raises from `Game.start()` — tkinter discards exceptions raised
+  inside an `after()` callback, so carrying the error out of the main loop is
+  what lets a caller see it at all. One traceback is logged per error streak
+  instead of one per frame.
+- **Rendering after a quit.** `update()` calling `game.quit()` — a menu's Quit
+  item, a win condition — was still followed by `render()` in the same tick,
+  drawing onto a destroyed canvas.
+- **`HUD.add_stat()` did not clamp `value`** to `max_value`, while `set_stat()`
+  did.
+
+### Added
+
+- **magmascript binding.** texastoast publishes itself as the `texastoast`
+  domain — or `tt` for short, the same domain under a second name — through a
+  `magmascript.domains` entry point, so `.mgs` scripts can drive the engine.
+  Neither package depends on the other; installing both is enough. Not named
+  `toast`, which magmascript's CLI already uses for clearing caches. See the
+  README and `examples/hello.mgs`. Requires magmascript 3.2+.
+- `Game(max_consecutive_errors=...)` and `GameLoop(max_consecutive_errors=...,
+  on_error=...)`; `GameLoop.error` holds whatever stopped the loop.
+- `DialogueBox.displayed` and `TileMap.solid_tiles` properties.
+- `tests/test_ui.py` — the `ui` package had no tests at all, which is why the
+  dialogue bug survived 0.2.0.
+
+### Changed
+
+- `TileMap(solid_tiles=...)`, `TileMap.from_file()`, `TileMap.save()` and
+  `CanvasRenderer.draw_tilemap(skip_tiles=...)` accept any iterable of tile
+  ids, not only a `set`. A list is the natural spelling from JSON and from
+  languages without a set literal.
+
 ## [0.2.0] — 2026-08-24
 
 A correctness release. Several bugs meant the engine did not behave the way its

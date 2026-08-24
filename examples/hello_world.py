@@ -35,7 +35,7 @@ def update(dt: float):
     player.move(state.dx, state.dy, dt, tilemap)
     renderer.camera.follow(
         player.center_x, player.center_y,
-        map_width=tilemap.width, map_height=tilemap.height,
+        map_width=tilemap.width, map_height=tilemap.height, dt=dt,
     )
 
 

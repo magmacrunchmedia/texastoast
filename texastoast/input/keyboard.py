@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from dataclasses import replace
 
 from texastoast.input.abstract import InputState
 
@@ -25,19 +26,37 @@ class KeyboardInput:
             "Shift_L": "select", "Shift_R": "select",
         }
 
+        # Several keys map to the same button. Tracking which of them are down,
+        # rather than a single bool, keeps the button held until the last one is
+        # released — otherwise tapping 'a' would cancel a held Left arrow.
+        self._held: dict[str, set[str]] = {}
+
         for key, button in key_map.items():
             press_seq = f"<KeyPress-{key}>"
             release_seq = f"<KeyRelease-{key}>"
-            press_id = root.bind(press_seq, lambda e, b=button: self._set(b, True))
-            release_id = root.bind(release_seq, lambda e, b=button: self._set(b, False))
+            press_id = root.bind(press_seq, lambda e, k=key, b=button: self._press(k, b))
+            release_id = root.bind(release_seq, lambda e, k=key, b=button: self._release(k, b))
             self._bindings.append((press_seq, press_id))
             self._bindings.append((release_seq, release_id))
 
-    def _set(self, button: str, value: bool):
-        setattr(self._state, button, value)
+    def _press(self, key: str, button: str):
+        self._held.setdefault(button, set()).add(key)
+        setattr(self._state, button, True)
+
+    def _release(self, key: str, button: str):
+        keys = self._held.get(button)
+        if keys is not None:
+            keys.discard(key)
+        setattr(self._state, button, bool(keys))
 
     def poll(self) -> InputState:
-        return self._state
+        """A snapshot of the current button state.
+
+        A copy, not the live object: callers keep the previous frame's state to
+        detect a fresh press, which is impossible if every poll hands back the
+        same instance.
+        """
+        return replace(self._state)
 
     def is_pressed(self, button: str) -> bool:
         return getattr(self._state, button, False)
@@ -51,4 +70,5 @@ class KeyboardInput:
                 # Root may already be torn down.
                 pass
         self._bindings.clear()
+        self._held.clear()
         self._state = InputState()

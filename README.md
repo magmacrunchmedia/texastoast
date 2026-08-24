@@ -53,7 +53,8 @@ def update(dt):
     state = keyboard.poll()
     player.move(state.dx, state.dy, dt, tilemap)
     renderer.camera.follow(player.center_x, player.center_y,
-                           map_width=tilemap.width, map_height=tilemap.height)
+                           map_width=tilemap.width, map_height=tilemap.height,
+                           dt=dt)
 
 def render():
     renderer.clear()
@@ -70,6 +71,28 @@ game.start()
 - `speed` is in **pixels per second**, not per frame.
 - `move()` takes the frame's `dt`, so movement is frame-rate independent.
 - Diagonals are normalized: holding two directions is the same speed as one.
+
+## Upgrading from 0.2.x
+
+`DialogueBox` and `Menu` are now drawn by your render loop, like `HUD` always
+was. If you call `renderer.clear()` each frame — the demos do — the old
+widgets were being wiped off the canvas while still reporting `active`, so the
+game looked frozen behind an invisible dialogue.
+
+```python
+def update(dt):
+    dialogue.update(dt)      # 0.3.0 — advances the typewriter
+    ...
+
+def render():
+    renderer.clear()
+    ...
+    hud.render()
+    dialogue.render()        # 0.3.0 — both are frame-driven now
+    menu.render()
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for the rest.
 
 ## Upgrading from 0.1.x
 
@@ -95,6 +118,7 @@ package — clone the repo to run them.
 | `examples/rpg_demo.py` | NPCs, dialogue, menus, HUD |
 | `examples/game_template.py` | Full game starting point |
 | `examples/magma_hub_demo.py` | I2C controller input |
+| `examples/hello.mgs` | The same demo written in magmascript |
 | `tools/tile_editor.py` | Tile map editor GUI |
 
 ## Documentation
@@ -136,8 +160,8 @@ renderer.draw_image(x, y, photo_image)
 renderer.draw_text(x, y, text)                  # world space, follows the camera
 renderer.draw_hud_text(x, y, text, fill="#fff") # screen space, ignores the camera
 
-# Camera
-renderer.camera.follow(target_x, target_y, map_width=800, map_height=600)
+# Camera — pass dt so the easing is frame-rate independent
+renderer.camera.follow(target_x, target_y, map_width=800, map_height=600, dt=dt)
 renderer.camera.set_position(x, y)
 renderer.camera.world_to_screen(wx, wy)
 renderer.camera.is_visible(x, y, w, h)
@@ -149,7 +173,7 @@ renderer.camera.is_visible(x, y, w, h)
 from texastoast import TileMap, Entity, AABB
 
 # Tile map
-tilemap = TileMap(grid_data, tile_size=16, solid_tiles={1, 2})
+tilemap = TileMap(grid_data, tile_size=16, solid_tiles={1, 2})  # any iterable
 tilemap = TileMap.from_file("map.json", tile_size=16)
 tilemap.save("map.json")
 tilemap.get(col, row)          # -> tile_id, or -1 out of bounds
@@ -186,6 +210,18 @@ state.is_any_direction()                         # bool
 `dx`/`dy` are raw axis reads and are *not* normalized — `Entity.move` does that
 for you. If you integrate position yourself, normalize before scaling by speed.
 
+`poll()` returns a fresh snapshot each call, so you can keep the previous
+frame's state to detect a button that was just pressed:
+
+```python
+def update(dt):
+    global prev
+    state = keyboard.poll()
+    if state.a and not prev.a:
+        interact()
+    prev = state
+```
+
 ### I2C
 
 Optional I2C support for connecting hardware controllers via Raspberry Pi.
@@ -221,7 +257,10 @@ from texastoast.ui import DialogueBox, Menu, HUD
 # Dialogue
 dialogue = DialogueBox(game.canvas, 640, 480)
 dialogue.show("Hello, world!", speaker="NPC", on_complete=callback)
-dialogue.dismiss()
+dialogue.update(dt)   # from your update(); advances the typewriter
+dialogue.render()     # from your render(); safe to call when inactive
+dialogue.dismiss()    # skip to the end, or close if already there
+dialogue.active, dialogue.waiting, dialogue.displayed
 
 # Menu
 menu = Menu(game.canvas, 640, 480)
@@ -231,6 +270,7 @@ menu.show(["Play", "Settings", "Quit"],
 menu.move_up()
 menu.move_down()
 menu.confirm()
+menu.render()         # from your render(); safe to call when inactive
 
 # HUD
 hud = HUD(game.canvas, 640, 480)
@@ -240,6 +280,61 @@ hud.add_text("score", "Score: 0", 10, 10, fill="#fdd835")
 hud.set_text("score", "Score: 100")
 hud.render()
 ```
+
+All three widgets draw from your render function, so a renderer that clears the
+canvas each frame puts them back. Call `render()` unconditionally — it is a
+no-op when the widget is not showing.
+
+## Scripting with magmascript
+
+texastoast publishes itself to [magmascript](https://github.com/magmacrunchmedia/magmascript)
+as the `texastoast` domain, or `tt` for short. Install both into the same
+environment and `.mgs` scripts can drive the engine directly — neither package
+depends on the other.
+
+```bash
+pip install texastoast magmascript
+magmascript examples/hello.mgs
+```
+
+```magmascript
+g = tt.game({"title": "hello", "width": 400, "height": 300, "fps": 30})
+r = tt.renderer(g, 400, 300)
+kb = tt.keyboard(g)
+world = tt.tilemap([[1,1,1],[1,0,1],[1,1,1]], 20, [1])
+player = tt.entity({"x": 25, "y": 25, "width": 14, "height": 14, "speed": 100})
+
+update = fn(dt) {
+    s = kb.poll()
+    player.move(s.dx, s.dy, dt, world)
+    r.camera.follow(player.center_x, player.center_y, world.width, world.height, dt)
+}
+render = fn() {
+    r.clear()
+    r.draw_tilemap(world, {0: "#7cb342", 1: "#5d4037"})
+    r.draw_rect(player.x, player.y, player.width, player.height, "#e94560")
+}
+g.set_update(update)
+g.set_render(render)
+g.start()
+```
+
+`tt` and `texastoast` are the same domain under two names — the domain object
+holds no state, so a script can use either, or both.
+
+The domain is called `texastoast` rather than `toast` because magmascript's CLI
+already spells `magmascript toast <target>` for clearing caches, and
+`magmascript texas <target>` for heavy operations. Those are shell verbs that
+never appear inside a script, so nothing actually collides — but reusing the
+name would make the two sets of docs read as a contradiction.
+
+Constructors take a dict rather than keyword arguments, since MagmaScript has no
+keyword-argument syntax; an unknown key is an error rather than a silent
+default. Everything else is the Python API unchanged — the objects a script
+holds are the same objects, so `player.x` reads and `player.speed = 200` writes
+go straight through.
+
+Needs magmascript 3.2 or newer. See [examples/hello.mgs](examples/hello.mgs).
 
 ## Design Philosophy
 

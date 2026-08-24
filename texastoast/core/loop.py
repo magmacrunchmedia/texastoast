@@ -18,11 +18,17 @@ class GameLoop:
         update_fn: Callable[[float], None],
         render_fn: Callable[[], None],
         fps: int = 30,
+        max_consecutive_errors: int = 10,
+        on_error: Callable[[BaseException], None] | None = None,
     ):
         self._root = root
         self._update_fn = update_fn
         self._render_fn = render_fn
         self._interval_ms = max(1, int(1000 / fps))
+        self._max_consecutive_errors = max_consecutive_errors
+        self._on_error = on_error
+        self._consecutive_errors = 0
+        self._error: BaseException | None = None
         self._running = False
         self._last_time = 0.0
         self._frame_count = 0
@@ -35,6 +41,11 @@ class GameLoop:
         return self._fps_display
 
     @property
+    def error(self) -> BaseException | None:
+        """The exception that stopped the loop, if one did."""
+        return self._error
+
+    @property
     def frame_count(self) -> int:
         return self._frame_count
 
@@ -45,6 +56,8 @@ class GameLoop:
         self._last_time = time.monotonic()
         self._fps_timer = self._last_time
         self._frame_count = 0
+        self._consecutive_errors = 0
+        self._error = None
         self._tick()
 
     def stop(self):
@@ -67,9 +80,49 @@ class GameLoop:
 
         try:
             self._update_fn(dt)
-            self._render_fn()
-        except Exception:
-            logger.exception("Exception in game loop update/render")
+            # update() may have quit the game — a menu's Quit item, a win
+            # condition, a script calling quit(). Rendering after that draws
+            # onto a destroyed canvas.
+            if self._running:
+                self._render_fn()
+        except Exception as exc:
+            # A loop that logs and carries on turns one broken callback into
+            # thousands of identical tracebacks a second while the game looks
+            # alive but does nothing. Tolerate a transient failure; give up on
+            # a persistent one.
+            self._consecutive_errors += 1
+            if (self._max_consecutive_errors > 0
+                    and self._consecutive_errors >= self._max_consecutive_errors):
+                logger.error(
+                    "Stopping the game loop after %d consecutive errors",
+                    self._consecutive_errors,
+                )
+                self._error = exc
+                self.stop()
+                if self._on_error is not None:
+                    # The owner takes it from here — typically by ending the
+                    # main loop and re-raising from start().
+                    try:
+                        self._on_error(exc)
+                    except Exception:
+                        logger.exception("Exception in game loop error handler")
+                    return
+                # Nothing is listening. Re-raising here does not reach the
+                # caller — tkinter catches it inside the after() callback and
+                # hands it to report_callback_exception — but that is what
+                # prints the traceback, which beats losing it entirely.
+                raise
+            if self._consecutive_errors == 1:
+                logger.exception("Exception in game loop update/render")
+            else:
+                # The same error, again. One traceback per streak is enough;
+                # repeating it 30 times a second buries everything else.
+                logger.error(
+                    "Exception in game loop update/render (%d in a row): %r",
+                    self._consecutive_errors, exc,
+                )
+        else:
+            self._consecutive_errors = 0
 
         self._frame_count += 1
         if now - self._fps_timer >= 1.0:

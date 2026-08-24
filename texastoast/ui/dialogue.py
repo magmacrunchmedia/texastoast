@@ -5,7 +5,13 @@ from collections.abc import Callable
 
 
 class DialogueBox:
-    """Canvas-based dialogue box with typewriter text and portrait support."""
+    """Canvas-based dialogue box with typewriter text and portrait support.
+
+    Drawing is frame-driven, like :class:`~texastoast.ui.hud.HUD`: call
+    :meth:`update` from the game's update function and :meth:`render` from its
+    render function. A renderer that clears the canvas each frame would
+    otherwise wipe the box off screen while the box still believes it is up.
+    """
 
     def __init__(
         self,
@@ -27,9 +33,8 @@ class DialogueBox:
 
         self._active = False
         self._full_text = ""
-        self._displayed = ""
         self._char_index = 0
-        self._after_id: int | None = None
+        self._elapsed = 0.0
         self._on_complete: Callable | None = None
         self._speaker = ""
         self._waiting = False
@@ -41,63 +46,58 @@ class DialogueBox:
 
     @property
     def waiting(self) -> bool:
+        """True once the full text is on screen and a dismiss will close it."""
         return self._waiting
 
+    @property
+    def displayed(self) -> str:
+        return self._full_text[:self._char_index]
+
     def show(self, text: str, speaker: str = "", on_complete: Callable | None = None):
-        self._cancel_pending()
         self._full_text = text
         self._speaker = speaker
         self._on_complete = on_complete
-        self._displayed = ""
         self._char_index = 0
+        self._elapsed = 0.0
         self._active = True
-        self._waiting = False
-        self._draw_box()
+        # Empty text has nothing to type, so it is immediately dismissable.
+        self._waiting = not text
 
-        if not text:
-            self._displayed = ""
-            self._waiting = True
-            self._render_text()
+    def update(self, dt: float):
+        """Advance the typewriter by ``dt`` seconds."""
+        if not self._active or self._waiting:
+            return
+
+        if self._speed <= 0:
+            self._char_index = len(self._full_text)
         else:
-            self._tick_type()
+            self._elapsed += dt
+            revealed = int(self._elapsed / self._speed)
+            if revealed > self._char_index:
+                self._char_index = min(revealed, len(self._full_text))
+
+        if self._char_index >= len(self._full_text):
+            self._waiting = True
 
     def dismiss(self):
+        """Skip to the end of the text, or close the box if it is already there."""
         if not self._active:
             return
         if self._waiting:
             self._active = False
-            self._cancel_pending()
             self._clear()
             if self._on_complete:
                 self._on_complete()
-        elif not self._waiting and self._char_index < len(self._full_text):
-            self._cancel_pending()
-            self._displayed = self._full_text
+        else:
             self._char_index = len(self._full_text)
             self._waiting = True
-            self._render_text()
 
-    def _tick_type(self):
+    def render(self):
+        """Draw the box. Safe to call every frame, active or not."""
+        self._canvas.delete(self._tag)
         if not self._active:
             return
-        if self._char_index < len(self._full_text):
-            self._displayed += self._full_text[self._char_index]
-            self._char_index += 1
-            self._render_text()
-            self._after_id = self._canvas.after(
-                int(self._speed * 1000), self._tick_type
-            )
-        else:
-            self._waiting = True
-            self._render_text()
 
-    def _cancel_pending(self):
-        if self._after_id:
-            self._canvas.after_cancel(self._after_id)
-            self._after_id = None
-
-    def _draw_box(self):
-        self._clear()
         x1 = self._padding
         y1 = self._height - self._box_height - self._padding
         x2 = self._width - self._padding
@@ -115,32 +115,25 @@ class DialogueBox:
                 tags=self._tag,
             )
 
-    def _render_text(self):
-        self._canvas.delete(f"{self._tag}_text")
-        x1 = self._padding
-        y1 = self._height - self._box_height - self._padding
-
         text_x = x1 + self._padding
-        text_y = y1 + (self._padding + 14 if not self._speaker else self._padding + 28)
+        text_y = y1 + (self._padding + 28 if self._speaker else self._padding + 14)
 
         self._canvas.create_text(
             text_x, text_y,
-            text=self._displayed, fill="#ffffff",
+            text=self.displayed, fill="#ffffff",
             font=self._font, anchor=tk.NW,
             width=self._width - self._padding * 4,
-            tags=(self._tag, f"{self._tag}_text"),
+            tags=self._tag,
         )
 
         if self._waiting:
-            prompt = "[A] continue"
             self._canvas.create_text(
                 self._width - self._padding * 2,
                 self._height - self._padding * 2,
-                text=prompt, fill="#aaaaaa",
+                text="[A] continue", fill="#aaaaaa",
                 font=("Courier", 9), anchor=tk.SE,
-                tags=(self._tag, f"{self._tag}_text"),
+                tags=self._tag,
             )
 
     def _clear(self):
-        self._cancel_pending()
         self._canvas.delete(self._tag)

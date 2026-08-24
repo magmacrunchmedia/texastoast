@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
 
 
@@ -11,19 +12,26 @@ class TileMap:
         self,
         grid: list[list[int]],
         tile_size: int = 16,
-        solid_tiles: set[int] | None = None,
+        solid_tiles: Iterable[int] | None = None,
     ):
         self._grid = grid
         self._tile_size = tile_size
-        self._solid_tiles = solid_tiles if solid_tiles is not None else set()
+        # Any iterable, not just a set: a list is the natural spelling from
+        # JSON and from languages without a set literal, and membership is all
+        # this is ever used for.
+        self._solid_tiles = set(solid_tiles) if solid_tiles is not None else set()
 
     @classmethod
-    def from_file(cls, path: str | Path, tile_size: int | None = None, solid_tiles: set[int] | None = None) -> TileMap:
+    def from_file(cls, path: str | Path, tile_size: int | None = None, solid_tiles: Iterable[int] | None = None) -> TileMap:
         with open(path) as f:
             data = json.load(f)
         ts = tile_size if tile_size is not None else data.get("tile_size", 16)
         st = solid_tiles if solid_tiles is not None else set(data.get("solid_tiles", []))
         return cls(data["grid"], tile_size=ts, solid_tiles=st)
+
+    @property
+    def solid_tiles(self) -> set[int]:
+        return self._solid_tiles
 
     @property
     def grid(self) -> list[list[int]]:
@@ -74,7 +82,7 @@ class TileMap:
     def to_grid_coords(self, world_x: float, world_y: float) -> tuple[int, int]:
         return int(world_x // self._tile_size), int(world_y // self._tile_size)
 
-    def save(self, path: str | Path, solid_tiles: set[int] | None = None):
+    def save(self, path: str | Path, solid_tiles: Iterable[int] | None = None):
         data = {
             "grid": self._grid,
             "tile_size": self._tile_size,

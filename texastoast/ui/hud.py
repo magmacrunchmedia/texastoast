@@ -36,10 +36,11 @@ class HUD:
 
     def add_stat(self, key: str, label: str, value: float = 100,
                  max_value: float = 100, color: str = "#e94560"):
-        self._stats[key] = HUDStat(label=label, value=value,
-                                   max_value=max_value, color=color)
+        self._stats[key] = HUDStat(label=label, max_value=max_value, color=color)
+        self.set_stat(key, value)
 
     def set_stat(self, key: str, value: float):
+        """Set a stat, clamped to ``[0, max_value]``."""
         if key in self._stats:
             self._stats[key].value = max(0, min(value, self._stats[key].max_value))
 

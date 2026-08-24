@@ -147,6 +147,8 @@ score = 0
 def update(dt):
     global score
 
+    dialogue.update(dt)
+
     if dialogue.active or menu.active or paused:
         return
 
@@ -154,7 +156,7 @@ def update(dt):
     player.move(state.dx, state.dy, dt, tilemap)
     renderer.camera.follow(
         player.center_x, player.center_y,
-        map_width=tilemap.width, map_height=tilemap.height,
+        map_width=tilemap.width, map_height=tilemap.height, dt=dt,
     )
 
     # proximity hint
@@ -173,6 +175,8 @@ def render():
     renderer.draw_tilemap(tilemap, TILE_COLORS)
     renderer.draw_rect(player.x, player.y, player.width, player.height, "#e94560")
     hud.render()
+    dialogue.render()
+    menu.render()
 
 
 game.set_update(update)

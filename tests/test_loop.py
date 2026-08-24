@@ -40,19 +40,60 @@ def test_loop_dt_is_clamped(tk_root):
     assert max(seen) <= GameLoop.MAX_DT
 
 
-def test_loop_survives_an_exception_in_update(tk_root):
+def test_loop_survives_a_transient_exception_in_update(tk_root):
     rendered = []
+    ticks = []
 
-    def boom(dt):
-        raise ValueError("kaboom")
+    def flaky(dt):
+        ticks.append(dt)
+        if len(ticks) == 1:
+            raise ValueError("kaboom")
 
-    loop = GameLoop(tk_root, boom, lambda: rendered.append(1), fps=60)
+    loop = GameLoop(tk_root, flaky, lambda: rendered.append(1), fps=60)
     loop.start()
     _pump(tk_root, 0.15)
     still_running = loop._running
     loop.stop()
-    # The exception is logged, not propagated, and the loop keeps ticking.
+    # A one-off failure is logged, not propagated, and the loop keeps ticking.
     assert still_running
+    assert len(ticks) > 1
+    assert rendered
+
+
+def test_loop_stops_and_reraises_after_persistent_errors(tk_root):
+    def boom(dt):
+        raise ValueError("kaboom")
+
+    seen = []
+    loop = GameLoop(tk_root, boom, lambda: None, fps=60,
+                    max_consecutive_errors=3, on_error=seen.append)
+    loop.start()
+    _pump(tk_root, 0.3)
+    # A loop that logged and carried on would spray tracebacks forever while
+    # the game looked alive; past the threshold it must stop and hand the real
+    # error to its owner.
+    assert not loop._running
+    assert isinstance(loop.error, ValueError)
+    assert [type(e) for e in seen] == [ValueError]
+    loop.stop()
+
+
+def test_error_count_resets_after_a_good_frame(tk_root):
+    ticks = []
+
+    def every_other(dt):
+        ticks.append(dt)
+        if len(ticks) % 2:
+            raise ValueError("kaboom")
+
+    loop = GameLoop(tk_root, every_other, lambda: None, fps=120, max_consecutive_errors=3)
+    loop.start()
+    _pump(tk_root, 0.2)
+    still_running = loop._running
+    loop.stop()
+    # Failures are only fatal when consecutive.
+    assert still_running
+    assert len(ticks) > 6
 
 
 def test_stop_is_idempotent_and_halts_ticking(tk_root):
@@ -127,3 +168,17 @@ def test_frame_delay_never_drops_below_one_ms(tk_root):
     loop._root = type("R", (), {"after": staticmethod(lambda ms, f=None: delays.append(ms))})()
     loop._tick()
     assert delays == [1]
+
+
+def test_quitting_from_update_skips_that_frame_s_render(tk_root):
+    rendered = []
+
+    def update(dt):
+        loop.stop()
+
+    loop = GameLoop(tk_root, update, lambda: rendered.append(1), fps=60)
+    loop.start()
+    _pump(tk_root, 0.1)
+    loop.stop()
+    # Rendering after a quit draws onto a canvas that may already be destroyed.
+    assert rendered == []

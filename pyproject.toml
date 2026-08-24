@@ -26,6 +26,14 @@ classifiers = [
     "Topic :: System :: Hardware :: Hardware Drivers",
 ]
 
+# Discovered by magmascript when both packages are installed, exposing the
+# engine to .mgs scripts. Neither package depends on the other. Not named
+# `toast`: magmascript's CLI already uses that verb for clearing caches.
+# `tt` is the same domain under a shorter name, for scripts that say it a lot.
+[project.entry-points."magmascript.domains"]
+texastoast = "texastoast.mgs:TexastoastDomain"
+tt = "texastoast.mgs:TexastoastDomain"
+
 [project.urls]
 Homepage = "https://github.com/magmacrunchmedia/texastoast"
 Source = "https://github.com/magmacrunchmedia/texastoast"

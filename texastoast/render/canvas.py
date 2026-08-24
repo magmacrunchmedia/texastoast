@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Iterable
 
 from texastoast.render.camera import Camera
 
@@ -26,7 +27,7 @@ class CanvasRenderer:
         self._canvas.delete("all")
 
     def draw_tilemap(self, tilemap, tile_colors: dict[int, str],
-                     skip_tiles: set[int] | None = None):
+                     skip_tiles: Iterable[int] | None = None):
         """Draw the visible region of ``tilemap``.
 
         A tile is drawn when its id has an entry in ``tile_colors``; ids that
@@ -34,6 +35,7 @@ class CanvasRenderer:
         """
         cam = self._camera
         ts = tilemap.tile_size
+        skip = set(skip_tiles) if skip_tiles is not None else None
 
         start_col = max(0, int(cam.x // ts))
         end_col = min(tilemap.cols, int((cam.x + self._width) // ts) + 2)
@@ -43,7 +45,7 @@ class CanvasRenderer:
         for row in range(start_row, end_row):
             for col in range(start_col, end_col):
                 tile_id = tilemap.get(col, row)
-                if skip_tiles is not None and tile_id in skip_tiles:
+                if skip is not None and tile_id in skip:
                     continue
                 color = tile_colors.get(tile_id)
                 if color is None:
