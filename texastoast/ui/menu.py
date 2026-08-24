@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from texastoast.render.abstract import as_ui_surface
+from texastoast.ui.theme import DEFAULT_THEME, Theme
 
 
 class Menu:
@@ -24,19 +25,22 @@ class Menu:
         surface,
         width: int | None = None,
         height: int | None = None,
-        font: tuple = ("Courier", 14),
-        selected_color: str = "#e94560",
-        normal_color: str = "#ffffff",
-        disabled_color: str = "#555555",
+        font: tuple | None = None,
+        selected_color: str | None = None,
+        normal_color: str | None = None,
+        disabled_color: str | None = None,
         item_padding: int = 8,
+        theme: Theme | None = None,
     ):
         self._surface = as_ui_surface(surface, width, height)
         self._width = width if width is not None else self._surface.width
         self._height = height if height is not None else self._surface.height
-        self._font = font
-        self._selected_color = selected_color
-        self._normal_color = normal_color
-        self._disabled_color = disabled_color
+        self._theme = theme or DEFAULT_THEME
+        # Explicit style kwargs still win; the theme supplies the defaults.
+        self._font = font or self._theme.font(14)
+        self._selected_color = selected_color or self._theme.primary
+        self._normal_color = normal_color or self._theme.text
+        self._disabled_color = disabled_color or self._theme.disabled
         self._item_padding = item_padding
 
         self._active = False
@@ -149,9 +153,11 @@ class Menu:
         x2 = cx + menu_width / 2
         y2 = cy + total_h / 2
 
+        theme = self._theme
         self._surface.ui_rect(
             x1 - 4, y1 - 4, (x2 + 4) - (x1 - 4), (y2 + 4) - (y1 - 4),
-            fill="#000000", outline="#ffffff", outline_width=2,
+            fill=theme.box_fill, outline=theme.box_outline,
+            outline_width=theme.outline_width,
             group=self._tag,
         )
 
@@ -160,7 +166,7 @@ class Menu:
         if self._title:
             self._surface.ui_text(
                 cx, y + 10, self._title,
-                fill=self._normal_color, font=("Courier", 11, "bold"),
+                fill=self._normal_color, font=theme.font(11, "bold"),
                 anchor="center",
                 group=self._tag,
             )
@@ -173,7 +179,7 @@ class Menu:
             if is_selected and is_enabled:
                 self._surface.ui_rect(
                     x1 + 4, y, (x2 - 4) - (x1 + 4), item_height,
-                    fill="#331111",
+                    fill=theme.selection_fill,
                     group=self._tag,
                 )
                 color = self._selected_color

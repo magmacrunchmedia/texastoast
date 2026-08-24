@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from texastoast.render.abstract import as_ui_surface
+from texastoast.ui.theme import DEFAULT_THEME, Theme
 
 
 class DialogueBox:
@@ -26,15 +27,18 @@ class DialogueBox:
         height: int | None = None,
         box_height: int = 100,
         padding: int = 12,
-        font: tuple = ("Courier", 12),
+        font: tuple | None = None,
         speed: float = 0.03,
+        theme: Theme | None = None,
     ):
         self._surface = as_ui_surface(surface, width, height)
         self._width = width if width is not None else self._surface.width
         self._height = height if height is not None else self._surface.height
         self._box_height = box_height
         self._padding = padding
-        self._font = font
+        self._theme = theme or DEFAULT_THEME
+        # An explicit font still wins; the theme supplies the default.
+        self._font = font or self._theme.font(12)
         self._speed = speed
 
         self._active = False
@@ -109,17 +113,19 @@ class DialogueBox:
         x2 = self._width - self._padding
         y2 = self._height - self._padding
 
+        theme = self._theme
         self._surface.ui_rect(
             x1, y1, x2 - x1, y2 - y1,
-            fill="#000000", outline="#ffffff", outline_width=2,
+            fill=theme.box_fill, outline=theme.box_outline,
+            outline_width=theme.outline_width,
             group=self._tag,
         )
 
         if self._speaker:
             self._surface.ui_text(
                 x1 + self._padding, y1 + 4,
-                self._speaker, fill="#e94560",
-                font=("Courier", 10, "bold"), anchor="nw",
+                self._speaker, fill=theme.primary,
+                font=theme.font(10, "bold"), anchor="nw",
                 group=self._tag,
             )
 
@@ -128,7 +134,7 @@ class DialogueBox:
 
         self._surface.ui_text(
             text_x, text_y,
-            self.displayed, fill="#ffffff",
+            self.displayed, fill=theme.text,
             font=self._font, anchor="nw",
             width=self._width - self._padding * 4,
             group=self._tag,
@@ -138,8 +144,8 @@ class DialogueBox:
             self._surface.ui_text(
                 self._width - self._padding * 2,
                 self._height - self._padding * 2,
-                "[A] continue", fill="#aaaaaa",
-                font=("Courier", 9), anchor="se",
+                "[A] continue", fill=theme.dim_text,
+                font=theme.font(9), anchor="se",
                 group=self._tag,
             )
 

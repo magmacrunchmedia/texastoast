@@ -28,8 +28,10 @@ the engine:
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
+from texastoast.audio.mixer import Mixer
 from texastoast.core.game import Game
 from texastoast.i2c.bus import I2CBus
 from texastoast.i2c.hub import MagmaHub
@@ -37,12 +39,17 @@ from texastoast.i2c.poller import HubPoller
 from texastoast.i2c.sim import simulated_hub
 from texastoast.input.keyboard import KeyboardInput
 from texastoast.input.magma_hub import CompositeInput, MagmaHubInput
+from texastoast.input.players import PlayerManager
 from texastoast.input.recording import InputRecorder, ReplayInput
 from texastoast.render.canvas import CanvasRenderer
+from texastoast.render.sprite import SpriteSheet
+from texastoast.scene import SceneStack
 from texastoast.ui.dialogue import DialogueBox
 from texastoast.ui.hud import HUD
 from texastoast.ui.menu import Menu
+from texastoast.ui.theme import DEFAULT_THEME, Theme
 from texastoast.world.entity import Entity
+from texastoast.world.group import EntityGroup
 from texastoast.world.tilemap import TileMap
 
 __all__ = ["TexastoastDomain"]
@@ -149,40 +156,82 @@ class TexastoastDomain:
     def dialogue(self, game: Any, opts: dict | None = None) -> DialogueBox:
         o = _options(opts, {
             "width": None, "height": None, "box_height": 100,
-            "padding": 12, "speed": 0.03,
+            "padding": 12, "speed": 0.03, "theme": None,
         }, "texastoast.dialogue()")
         return DialogueBox(
             self._surface_of(game),
             width=None if o["width"] is None else int(o["width"]),
             height=None if o["height"] is None else int(o["height"]),
             box_height=int(o["box_height"]), padding=int(o["padding"]),
-            speed=float(o["speed"]),
+            speed=float(o["speed"]), theme=o["theme"],
         )
 
     def menu(self, game: Any, opts: dict | None = None) -> Menu:
         o = _options(opts, {
             "width": None, "height": None,
-            "selected_color": "#e94560", "normal_color": "#ffffff",
-            "disabled_color": "#555555", "item_padding": 8,
+            "selected_color": None, "normal_color": None,
+            "disabled_color": None, "item_padding": 8, "theme": None,
         }, "texastoast.menu()")
         return Menu(
             self._surface_of(game),
             width=None if o["width"] is None else int(o["width"]),
             height=None if o["height"] is None else int(o["height"]),
-            selected_color=str(o["selected_color"]),
-            normal_color=str(o["normal_color"]),
-            disabled_color=str(o["disabled_color"]),
-            item_padding=int(o["item_padding"]),
+            selected_color=None if o["selected_color"] is None else str(o["selected_color"]),
+            normal_color=None if o["normal_color"] is None else str(o["normal_color"]),
+            disabled_color=None if o["disabled_color"] is None else str(o["disabled_color"]),
+            item_padding=int(o["item_padding"]), theme=o["theme"],
         )
 
     def hud(self, game: Any, opts: dict | None = None) -> HUD:
-        o = _options(opts, {"width": None, "height": None, "padding": 8},
+        o = _options(opts, {"width": None, "height": None, "padding": 8,
+                            "theme": None},
                      "texastoast.hud()")
         return HUD(
             self._surface_of(game),
             width=None if o["width"] is None else int(o["width"]),
             height=None if o["height"] is None else int(o["height"]),
-            padding=int(o["padding"]),
+            padding=int(o["padding"]), theme=o["theme"],
+        )
+
+    def theme(self, opts: dict | None = None) -> Theme:
+        """A widget theme. Options are the Theme fields; omitted ones keep
+        the engine defaults."""
+        defaults = dataclasses.asdict(DEFAULT_THEME)
+        o = _options(opts, defaults, "texastoast.theme()")
+        return Theme(**{k: o[k] for k in defaults})
+
+    # ── structure ───────────────────────────────────────────────────
+
+    def scenes(self) -> SceneStack:
+        """A scene stack. The script wires it itself:
+        ``g.set_update(s.update)``, ``g.set_render(s.render)``."""
+        return SceneStack()
+
+    def entities(self) -> EntityGroup:
+        return EntityGroup()
+
+    def sprite_sheet(self, path: Any, frame_width: Any,
+                     frame_height: Any) -> SpriteSheet:
+        """A sprite sheet. Frames are fetched with the game's root:
+        ``sheet.get_frame(g.root, col, row)``."""
+        return SpriteSheet(str(path), int(_num(frame_width)),
+                           int(_num(frame_height)))
+
+    # ── audio ───────────────────────────────────────────────────────
+
+    def mixer(self) -> Mixer:
+        """An audio mixer on the best backend this machine offers. Wire
+        teardown yourself: ``g.on_close(m.close)``."""
+        return Mixer()
+
+    # ── players ─────────────────────────────────────────────────────
+
+    def players(self, opts: dict | None = None) -> PlayerManager:
+        o = _options(opts, {"max_players": 4, "join_buttons": ("a", "start")},
+                     "texastoast.players()")
+        return PlayerManager(
+            max_players=int(o["max_players"]),
+            join_buttons=tuple(str(b) for b in o["join_buttons"]),
         )
 
     # ── hardware ────────────────────────────────────────────────────

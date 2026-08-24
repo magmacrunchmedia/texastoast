@@ -48,6 +48,7 @@ Changelog = "https://github.com/magmacrunchmedia/texastoast/blob/main/CHANGELOG.
 [project.optional-dependencies]
 hardware = ["smbus2>=0.6"]
 sprites = ["Pillow>=9.0"]
+audio = ["pygame-ce>=2.4"]
 dev = ["pytest>=7.0", "ruff>=0.6"]
 
 # Version is read from the package so it is defined in exactly one place.

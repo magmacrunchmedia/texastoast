@@ -27,6 +27,9 @@ class Entity:
         self.speed = speed
         self.vel_x = 0.0
         self.vel_y = 0.0
+        # Set False to be culled by an EntityGroup after the next update pass —
+        # lets an entity die inside its own update() without a group reference.
+        self.alive = True
 
     @property
     def aabb(self) -> AABB:

@@ -2,18 +2,28 @@
 """Game template — a starting point for new texastoast games.
 
 This demonstrates the full feature set:
-  - Game loop with fixed timestep
-  - Tile map with collision
-  - Camera following player
-  - Keyboard input
-  - HUD with stats
-  - Dialogue system
-  - Pause menu
+  - Scene stack: world, pause menu, and dialogue as scenes
+  - Tile map with collision, camera following the player
+  - Entity group driving updates
+  - Keyboard input, HUD with stats
+
+The 0.4.0 version of this file kept `paused` and `showing_dialogue` globals,
+early-returned from update() while either was set, and dispatched keys down an
+if-chain. All of that is gone: modality is the stack. Pushing PauseScene
+freezes WorldScene by construction; popping it resumes. No flags exist.
 
 Copy this file and modify it to build your own game.
 """
 
-from texastoast import CanvasRenderer, Entity, Game, KeyboardInput, TileMap
+from texastoast import (
+    CanvasRenderer,
+    Entity,
+    EntityGroup,
+    Game,
+    KeyboardInput,
+    SceneStack,
+    TileMap,
+)
 from texastoast.ui import HUD, DialogueBox, Menu
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -24,16 +34,12 @@ TILE_SIZE = 20
 FPS = 30
 PLAYER_SPEED = 100
 
-# ── Colors ──────────────────────────────────────────────────────────
-
 TILE_COLORS = {
     0: "#7cb342",  # grass
     1: "#5d4037",  # wall
     2: "#1e88e5",  # water
     3: "#fdd835",  # path
 }
-
-# ── Map ─────────────────────────────────────────────────────────────
 
 LEVEL_1 = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -58,129 +64,156 @@ LEVEL_1 = [
 game = Game(title="texastoast game template", width=SCREEN_W, height=SCREEN_H, fps=FPS)
 renderer = CanvasRenderer(game.canvas, SCREEN_W, SCREEN_H)
 keyboard = KeyboardInput(game.root)
-# UI widgets take the renderer and inherit its dimensions.
-dialogue = DialogueBox(renderer)
-menu = Menu(renderer)
-hud = HUD(renderer)
-
-tilemap = TileMap(LEVEL_1, tile_size=TILE_SIZE, solid_tiles={1, 2})
-player = Entity(x=60, y=60, width=14, height=14, speed=PLAYER_SPEED)
-
-# ── Game state ──────────────────────────────────────────────────────
-
-paused = False
-showing_dialogue = False
-hp = 100
-xp = 0
-score = 0
-
-hud.add_stat("hp", "HP", value=hp, max_value=100, color="#e94560")
-hud.add_stat("xp", "XP", value=xp, max_value=100, color="#4fc3f7")
-hud.add_text("score", "Score: 0", SCREEN_W - 120, 4, fill="#fdd835")
-hud.add_text("pos", "", 4, SCREEN_H - 16, fill="#666666", font=("Courier", 8))
+game.on_close(keyboard.destroy)
+stack = SceneStack()
 
 
-# ── Input handling ──────────────────────────────────────────────────
+# ── Scenes ──────────────────────────────────────────────────────────
 
-def handle_keypress(event):
-    global paused, showing_dialogue, hp, xp, score
+class WorldScene:
+    """The game itself: player, map, camera, HUD."""
 
-    key = event.keysym
+    def __init__(self):
+        self.tilemap = TileMap(LEVEL_1, tile_size=TILE_SIZE, solid_tiles={1, 2})
+        self.entities = EntityGroup()
+        self.player = self.entities.add(
+            Entity(x=60, y=60, width=14, height=14, speed=PLAYER_SPEED), "player"
+        )
+        self.hp = 100
+        self.xp = 0
 
-    if dialogue.active:
-        if key in ("z", "Z", "Return", "space"):
-            dialogue.dismiss()
-        return
+        self.hud = HUD(renderer)
+        self.hud.add_stat("hp", "HP", value=self.hp, max_value=100)
+        self.hud.add_stat("xp", "XP", value=self.xp, max_value=100, color="#4fc3f7")
+        self.hud.add_text("score", "Score: 0", SCREEN_W - 120, 4, fill="#fdd835")
+        self.hud.add_text("pos", "", 4, SCREEN_H - 16, fill="#666666",
+                          font=("Courier", 8))
 
-    if menu.active:
-        if key in ("Up", "w", "W"):
-            menu.move_up()
-        elif key in ("Down", "s", "S"):
-            menu.move_down()
-        elif key in ("z", "Z", "Return"):
-            menu.confirm()
-        elif key in ("x", "X", "Escape"):
-            menu.cancel()
-        return
+    def update(self, dt):
+        state = keyboard.poll()
+        self.player.move(state.dx, state.dy, dt, self.tilemap)
+        self.entities.update(dt)
+        renderer.camera.follow(
+            self.player.center_x, self.player.center_y,
+            map_width=self.tilemap.width, map_height=self.tilemap.height, dt=dt,
+        )
+        self.hud.set_text("pos", f"({int(self.player.x)}, {int(self.player.y)})")
 
-    if key in ("Escape", "p", "P"):
-        toggle_pause()
-    elif key in ("z", "Z", "Return"):
-        # Example: press Z near water to "fish"
-        col, row = tilemap.to_grid_coords(player.center_x, player.center_y)
+    def render(self):
+        renderer.clear()
+        renderer.draw_tilemap(self.tilemap, TILE_COLORS)
+        for entity in self.entities.sorted_by_y():
+            renderer.draw_rect(entity.x, entity.y, entity.width, entity.height,
+                               "#e94560")
+        self.hud.render()
+        renderer.present()
+
+    def handle_key(self, event):
+        key = event.keysym
+        if key in ("Escape", "p", "P"):
+            stack.push(PauseScene(self))
+            return True
+        if key in ("z", "Z", "Return"):
+            return self._try_fish()
+        return False
+
+    def _try_fish(self):
+        # Press Z next to water to "fish".
+        col, row = self.tilemap.to_grid_coords(self.player.center_x,
+                                               self.player.center_y)
         for dr in range(-1, 2):
             for dc in range(-1, 2):
-                if tilemap.get(col + dc, row + dr) == 2:
-                    showing_dialogue = True
-                    dialogue.show("You caught a fish! +10 XP",
-                                  on_complete=_on_dialogue_done)
-                    xp = min(100, xp + 10)
-                    hud.set_stat("xp", xp)
-                    return
+                if self.tilemap.get(col + dc, row + dr) == 2:
+                    self.xp = min(100, self.xp + 10)
+                    self.hud.set_stat("xp", self.xp)
+                    stack.push(DialogueScene("You caught a fish! +10 XP"))
+                    return True
+        return False
+
+    def restart(self):
+        self.hp, self.xp = 100, 0
+        self.player.x, self.player.y = 60, 60
+        self.hud.set_stat("hp", self.hp)
+        self.hud.set_stat("xp", self.xp)
 
 
-def _on_dialogue_done():
-    global showing_dialogue
-    showing_dialogue = False
+class PauseScene:
+    """The pause menu, drawn over the visible, frozen world.
+
+    No `paused` flag anywhere: the world freezes because it is not the top
+    scene, and render_below keeps it visible underneath.
+    """
+
+    render_below = True
+
+    def __init__(self, world: WorldScene):
+        self._world = world
+        self._menu = Menu(renderer)
+
+    def on_enter(self):
+        self._menu.show(
+            ["Resume", "Restart", "Quit"],
+            on_select=self._on_select,
+            on_cancel=stack.pop,
+            title="PAUSED",
+        )
+
+    def on_exit(self):
+        self._menu.hide()
+
+    def update(self, dt):
+        pass
+
+    def render(self):
+        self._menu.render()
+
+    def handle_key(self, event):
+        key = event.keysym
+        if key in ("Up", "w", "W"):
+            self._menu.move_up()
+        elif key in ("Down", "s", "S"):
+            self._menu.move_down()
+        elif key in ("z", "Z", "Return"):
+            self._menu.confirm()
+        elif key in ("x", "X", "Escape"):
+            self._menu.cancel()
+        return True
+
+    def _on_select(self, index, label):
+        if label == "Restart":
+            self._world.restart()
+        elif label == "Quit":
+            game.quit()
+            return
+        stack.pop()
 
 
-def toggle_pause():
-    global paused
-    paused = not paused
-    if paused:
-        menu.show(["Resume", "Restart", "Quit"],
-                   on_select=_on_menu_select,
-                   on_cancel=lambda: toggle_pause(),
-                   title="PAUSED")
-    else:
-        menu.hide()
+class DialogueScene:
+    """A dialogue box over the visible world. The typewriter runs because this
+    scene's update drives it; the world underneath is frozen."""
+
+    render_below = True
+
+    def __init__(self, text, speaker=""):
+        self._dialogue = DialogueBox(renderer, speed=0.03)
+        self._dialogue.show(text, speaker=speaker, on_complete=stack.pop)
+
+    def update(self, dt):
+        self._dialogue.update(dt)
+
+    def render(self):
+        self._dialogue.render()
+
+    def handle_key(self, event):
+        if event.keysym in ("z", "Z", "Return", "space"):
+            self._dialogue.dismiss()
+        return True
 
 
-def _on_menu_select(index, label):
-    global paused, hp, xp, score
-    if label == "Resume":
-        paused = False
-    elif label == "Restart":
-        hp, xp, score = 100, 0, 0
-        player.x, player.y = 60, 60
-        hud.set_stat("hp", hp)
-        hud.set_stat("xp", xp)
-        paused = False
-    elif label == "Quit":
-        game.quit()
+# ── Wiring ──────────────────────────────────────────────────────────
 
-
-game.bind_key("<Key>", handle_keypress)
-
-
-# ── Update ──────────────────────────────────────────────────────────
-
-def update(dt):
-    dialogue.update(dt)
-
-    if dialogue.active or menu.active or paused:
-        return
-
-    state = keyboard.poll()
-    player.move(state.dx, state.dy, dt, tilemap)
-    renderer.camera.follow(
-        player.center_x, player.center_y,
-        map_width=tilemap.width, map_height=tilemap.height, dt=dt,
-    )
-    hud.set_text("pos", f"({int(player.x)}, {int(player.y)})")
-
-
-# ── Render ──────────────────────────────────────────────────────────
-
-def render():
-    renderer.clear()
-    renderer.draw_tilemap(tilemap, TILE_COLORS)
-    renderer.draw_rect(player.x, player.y, player.width, player.height, "#e94560")
-    hud.render()
-    dialogue.render()
-    menu.render()
-
-
-game.set_update(update)
-game.set_render(render)
+stack.push(WorldScene())
+game.set_update(stack.update)
+game.set_render(stack.render)
+game.bind_key("<Key>", stack.dispatch_key)
 game.start()

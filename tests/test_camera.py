@@ -34,19 +34,30 @@ def test_camera_clamp_right_edge():
     assert cam.y == 200.0
 
 
-def test_camera_follow_without_dt_warns_but_still_works():
-    # The no-dt path is deprecated (0.5.0 will require dt) but must keep the
-    # old behaviour until then.
+def test_camera_follow_without_dt_raises():
+    # Regression: the no-dt path applied smoothing per *frame*, so the camera
+    # converged twice as fast at 60 fps as at 30. It warned through 0.4.x and
+    # is an error as of 0.5.0 — silently keeping the old behaviour would let
+    # the frame-rate dependency back in.
     cam = Camera(100, 100, smoothing=1.0)
-    with pytest.warns(DeprecationWarning, match="dt"):
+    with pytest.raises(TypeError, match="dt"):
         cam.follow(200, 200, map_width=500, map_height=500)
+    assert cam.x == 0  # nothing moved
+
+
+def test_camera_follow_positional_dt_still_works():
+    # hello.mgs calls follow(x, y, w, h, dt) fully positionally — dt staying
+    # last in the signature is what keeps that 0.4.x call site working.
+    cam = Camera(100, 100, smoothing=1.0)
+    cam.follow(200, 200, 500, 500, 1 / 30)
     assert cam.x == 150.0
+    assert cam.y == 150.0
 
 
 def test_camera_follow_with_dt_does_not_warn():
     cam = Camera(100, 100, smoothing=0.1)
     with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
+        warnings.simplefilter("error")
         cam.follow(200, 200, dt=1 / 30)
 
 

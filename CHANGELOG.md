@@ -5,6 +5,85 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-08-24
+
+The game structure release. 0.4.0 made the *hardware* buildable without
+hardware; 0.5.0 makes the *game* buildable without flag soup. Until now every
+example hand-rolled its modal state — the template kept `paused` and
+`showing_dialogue` globals, early-returned from `update()` while either was
+set, and dispatched keys down an if-chain. This release ships the systems
+that subsume the pattern: scenes, entity groups, and player seats, plus
+audio, theming, and the camera break committed in 0.4.0's deprecation.
+
+### Added
+
+- **Scene stack** (`texastoast.scene`). Modality as a stack instead of flags:
+  **pushing a scene freezes the scenes below by construction**, so `paused`
+  simply stops existing. A scene is anything with `update(dt)` and
+  `render()` — no base class, per the house rule; lifecycle hooks
+  (`on_enter`/`on_exit`/`on_pause`/`on_resume`), `handle_key`, and the
+  `update_below`/`render_below` overlay flags are optional and detected by
+  presence. All stack operations are deferred to the next frame — one rule,
+  which is what lets a scene pop itself mid-update, and lands a key-event
+  push before that frame renders. The stack imports nothing, never binds
+  anything, and is wired by the game: `game.set_update(stack.update)`.
+  `examples/game_template.py` is rewritten as the reference — its flag soup
+  and dispatch chain are gone.
+- **EntityGroup** (`texastoast.world.group`). Nothing iterated entities
+  before; every game hand-rolled the loop. The group drives `update(dt)`,
+  defers add/remove so mutation mid-pass cannot skip a neighbor (the classic
+  first bug of every entity system), indexes tags *in the group* so
+  duck-typed members never grow attributes, and offers `sorted_by_y()` (feet
+  line — painter's order is by baseline) for caller-driven rendering. The
+  group never draws. Entities can die in their own `update()` via
+  `alive = False`; deliberately absent: spatial hashing, z-layers,
+  group-owned rendering — systems, not policy.
+- **Audio** (`texastoast.audio`), because the engine had none. `Mixer` with
+  `load`/`play`/`play_music`/`stop_music`/`stop_all`/`set_master_volume`,
+  over a backend chain that degrades exactly like `I2CBus`: pygame-ce (the
+  new `audio` extra — chosen over alternatives because SDL2 wheels are
+  first-class on the Pi *and* the same dependency serves the planned pygame
+  rendering backend, one dep for two releases) → the platform's basic player
+  (`winsound`/`aplay`/`afplay`, honestly SFX-grade) → a null backend where
+  every call is a silent no-op. A game with no audio device runs identically.
+  **WAV is the guaranteed format** on every tier; a missing asset logs and
+  plays as silence, because a Pi image missing one file must not kill the
+  game. pygame is imported only inside its backend — never at import time.
+- **Player seats** (`texastoast.input.players`). `PlayerManager` assigns
+  input sources to seats: join is edge-triggered (a *fresh* A/Start press —
+  holding the button through the join screen claims one seat, not one per
+  frame), the keyboard is claimable like any controller, and hotplug rides
+  the duck-typed `connected` attribute. A disconnected seat polls **idle**,
+  never the buttons held at the moment of unplug — the same rationale as
+  `MagmaHubInput`'s reset — and a returning controller **reclaims the same
+  seat**, re-firing `on_join`: a bounced cable must not reshuffle who is P1.
+  (No separate `on_rejoin`; two callbacks instead of four, trade noted.)
+  `examples/two_player_demo.py` demonstrates join/leave/rejoin with a
+  simulated hub — zero hardware, per the 0.4.0 promise.
+- **Theme** (`texastoast.ui.theme`). The widget palette was frozen as
+  literals scattered across three files; `Theme` states it once, and
+  `DEFAULT_THEME` carries exactly the old values — pinned by a regression
+  test, so a default-themed game renders identically. Frozen dataclass;
+  variants via `dataclasses.replace`. Layout metrics stay out: layout is not
+  theme.
+- **magmascript factories**: `scenes`, `entities`, `sprite_sheet`, `theme`,
+  `mixer`, `players`; UI factories take a `"theme"` option.
+
+### Changed
+
+- **Widget style kwargs now default from the theme** (identical values).
+  Explicit kwargs still win, including `add_stat(color=...)`.
+- **`Entity` gained `alive = True`** — one line, consumed by `EntityGroup`.
+
+### Breaking
+
+- **`Camera.follow()` requires `dt`.** Deprecated with a warning through
+  0.4.x, an error now: the no-`dt` path applied smoothing per frame, so the
+  camera converged twice as fast at 60 fps as at 30. `dt` stays *last* in
+  the signature, so correct 0.4.x call sites — keyword and full-positional —
+  work unchanged; only the calls that were already warning now raise, with
+  the fix spelled out in the error message.
+
 ## [0.4.0] — 2026-08-24
 
 The hardware dev-kit release. The premise: **you should not need the hardware

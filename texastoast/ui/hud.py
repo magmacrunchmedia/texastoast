@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from texastoast.render.abstract import as_ui_surface
+from texastoast.ui.theme import DEFAULT_THEME, Theme
 
 
 @dataclass
@@ -29,21 +30,26 @@ class HUD:
         surface,
         width: int | None = None,
         height: int | None = None,
-        font: tuple = ("Courier", 10),
+        font: tuple | None = None,
         padding: int = 8,
+        theme: Theme | None = None,
     ):
         self._surface = as_ui_surface(surface, width, height)
         self._width = width if width is not None else self._surface.width
         self._height = height if height is not None else self._surface.height
-        self._font = font
+        self._theme = theme or DEFAULT_THEME
+        # An explicit font still wins; the theme supplies the default.
+        self._font = font or self._theme.font(10)
         self._padding = padding
         self._tag = "hud"
         self._stats: dict[str, HUDStat] = {}
         self._custom_texts: dict[str, tuple[str, float, float, dict]] = {}
 
     def add_stat(self, key: str, label: str, value: float = 100,
-                 max_value: float = 100, color: str = "#e94560"):
-        self._stats[key] = HUDStat(label=label, max_value=max_value, color=color)
+                 max_value: float = 100, color: str | None = None):
+        # An explicit color still wins; the theme supplies the default.
+        self._stats[key] = HUDStat(label=label, max_value=max_value,
+                                   color=color or self._theme.primary)
         self.set_stat(key, value)
 
     def set_stat(self, key: str, value: float):
@@ -52,7 +58,7 @@ class HUD:
             self._stats[key].value = max(0, min(value, self._stats[key].max_value))
 
     def add_text(self, key: str, text: str, x: float, y: float, **kwargs):
-        defaults = {"fill": "#ffffff", "font": self._font, "anchor": "nw"}
+        defaults = {"fill": self._theme.text, "font": self._font, "anchor": "nw"}
         defaults.update(kwargs)
         self._custom_texts[key] = (text, x, y, defaults)
 
@@ -81,16 +87,17 @@ class HUD:
         bar_height = 10
         line_height = 20
 
+        theme = self._theme
         for stat in self._stats.values():
             if stat.show_text:
                 self._surface.ui_text(
-                    x, y, stat.label, fill="#cccccc",
+                    x, y, stat.label, fill=theme.label_text,
                     font=self._font, anchor="nw",
                     group=self._tag,
                 )
                 value_text = f"{int(stat.value)}/{int(stat.max_value)}"
                 self._surface.ui_text(
-                    x + bar_width + 8, y, value_text, fill="#aaaaaa",
+                    x + bar_width + 8, y, value_text, fill=theme.dim_text,
                     font=self._font, anchor="nw",
                     group=self._tag,
                 )
@@ -101,7 +108,8 @@ class HUD:
                 ratio = stat.value / stat.max_value if stat.max_value > 0 else 0
                 self._surface.ui_rect(
                     bar_x, bar_y, bar_width, bar_height,
-                    fill="#333333", outline="#555555", outline_width=1,
+                    fill=theme.bar_fill, outline=theme.bar_outline,
+                    outline_width=1,
                     group=self._tag,
                 )
                 if ratio > 0:
@@ -117,7 +125,7 @@ class HUD:
         for text, x, y, opts in self._custom_texts.values():
             self._surface.ui_text(
                 x, y, text,
-                fill=opts.get("fill", "#ffffff"),
+                fill=opts.get("fill", self._theme.text),
                 font=opts.get("font", self._font),
                 anchor=str(opts.get("anchor", "nw")),
                 width=opts.get("width"),

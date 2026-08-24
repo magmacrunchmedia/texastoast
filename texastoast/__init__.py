@@ -1,6 +1,6 @@
 """texastoast — Python RPG engine with I2C hardware abstraction."""
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 
 def __getattr__(name):
@@ -8,18 +8,26 @@ def __getattr__(name):
         from texastoast.core import Config, Game, GameLoop
         return {"Config": Config, "GameLoop": GameLoop, "Game": Game}[name]
 
+    if name in ("Scene", "SceneStack"):
+        from texastoast import scene
+        return getattr(scene, name)
+
+    if name == "Mixer":
+        from texastoast.audio import Mixer
+        return Mixer
+
     if name in ("CanvasRenderer", "Camera", "SpriteSheet", "Renderer", "UISurface"):
         from texastoast.render import Camera, CanvasRenderer, Renderer, SpriteSheet, UISurface
         return {"CanvasRenderer": CanvasRenderer, "Camera": Camera,
                 "SpriteSheet": SpriteSheet, "Renderer": Renderer,
                 "UISurface": UISurface}[name]
 
-    if name in ("TileMap", "Entity", "AABB"):
-        from texastoast.world import AABB, Entity, TileMap
-        return {"TileMap": TileMap, "Entity": Entity, "AABB": AABB}[name]
+    if name in ("TileMap", "Entity", "AABB", "EntityGroup"):
+        from texastoast import world
+        return getattr(world, name)
 
     if name in ("InputState", "KeyboardInput", "MagmaHubInput", "CompositeInput",
-                "InputRecorder", "ReplayInput"):
+                "InputRecorder", "ReplayInput", "Player", "PlayerManager"):
         # getattr, not a from-import: importing the whole group would pull in
         # KeyboardInput (and with it tkinter) to answer for InputRecorder.
         from texastoast import input as input_pkg
@@ -31,9 +39,9 @@ def __getattr__(name):
         from texastoast import i2c
         return getattr(i2c, name)
 
-    if name in ("DialogueBox", "Menu", "HUD"):
-        from texastoast.ui import HUD, DialogueBox, Menu
-        return {"DialogueBox": DialogueBox, "Menu": Menu, "HUD": HUD}[name]
+    if name in ("DialogueBox", "Menu", "HUD", "Theme", "DEFAULT_THEME"):
+        from texastoast import ui
+        return getattr(ui, name)
 
     raise AttributeError(f"module 'texastoast' has no attribute {name!r}")
 
@@ -42,6 +50,14 @@ __all__ = [
     "Config",
     "GameLoop",
     "Game",
+    "Scene",
+    "SceneStack",
+    "Mixer",
+    "EntityGroup",
+    "Player",
+    "PlayerManager",
+    "Theme",
+    "DEFAULT_THEME",
     "CanvasRenderer",
     "Camera",
     "SpriteSheet",

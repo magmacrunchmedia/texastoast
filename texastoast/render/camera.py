@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import warnings
 from dataclasses import dataclass
 
 # ``smoothing`` was calibrated as a per-frame lerp factor at this rate, so it
@@ -22,22 +21,22 @@ class Camera:
                map_height: int = 0, dt: float | None = None):
         """Ease the viewport towards ``(target_x, target_y)``.
 
-        Pass the frame's ``dt`` to make the easing frame-rate independent:
-        ``smoothing`` is then a per-frame factor *at 30 fps*, converted to a
-        time constant, so the camera lags by the same distance at any fps.
-        Omitting ``dt`` keeps the old per-frame behaviour.
+        ``dt`` is the frame's delta time and is required: ``smoothing`` is a
+        per-frame factor *at 30 fps*, converted to a time constant, so the
+        camera lags by the same distance at any frame rate. It stays last in
+        the signature (rather than becoming bare-positional) so that correct
+        0.4.x call sites — keyword ``dt=dt`` and full-positional five-argument
+        calls — keep working unchanged.
 
-        .. deprecated:: 0.4.0
-            Calling without ``dt`` is deprecated; 0.5.0 will require it. The
-            no-``dt`` path makes the camera converge twice as fast at 60 fps
-            as at 30.
+        .. versionchanged:: 0.5.0
+            ``dt`` is required. Deprecated since 0.4.0.
         """
         if dt is None:
-            warnings.warn(
-                "Camera.follow() without dt is frame-rate dependent and will "
-                "require dt in texastoast 0.5.0 — pass the frame's dt.",
-                DeprecationWarning,
-                stacklevel=2,
+            raise TypeError(
+                "Camera.follow() missing required argument 'dt' — pass the "
+                "frame's dt, e.g. camera.follow(x, y, dt=dt). Calling without "
+                "dt was deprecated in 0.4.0: the no-dt path converged twice "
+                "as fast at 60 fps as at 30."
             )
         target_cx = target_x - self.width / 2
         target_cy = target_y - self.height / 2
@@ -51,7 +50,7 @@ class Camera:
         if map_height > 0:
             self.y = max(0, min(self.y, map_height - self.height))
 
-    def _alpha(self, dt: float | None) -> float:
+    def _alpha(self, dt: float) -> float:
         """The lerp factor for this frame.
 
         Applying ``smoothing`` once per frame means the camera converges twice
@@ -59,8 +58,6 @@ class Camera:
         and integrating over ``dt`` removes the dependency.
         """
         s = min(max(self.smoothing, 0.0), 1.0)
-        if dt is None:
-            return s
         if s >= 1.0:
             return 1.0
         if s <= 0.0 or dt <= 0.0:

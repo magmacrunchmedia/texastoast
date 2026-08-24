@@ -28,9 +28,12 @@ Optional extras:
 ```bash
 pip install "texastoast[sprites]"   # Pillow, for sprite sheet cropping
 pip install "texastoast[hardware]"  # smbus2, for I2C controllers on Raspberry Pi
+pip install "texastoast[audio]"     # pygame-ce, for real audio mixing
 ```
 
-Neither is required — the engine runs on keyboard input with no extras installed.
+None are required — the engine runs on keyboard input with no extras
+installed, and without `[audio]` sound degrades to the platform's basic
+player (or to silence) rather than failing.
 
 ### From source
 
@@ -79,6 +82,22 @@ game.start()
 - `speed` is in **pixels per second**, not per frame.
 - `move()` takes the frame's `dt`, so movement is frame-rate independent.
 - Diagonals are normalized: holding two directions is the same speed as one.
+
+## Upgrading from 0.4.x
+
+One break: `Camera.follow()` now **requires** `dt` (it warned throughout
+0.4.x). The no-`dt` path applied smoothing per frame, so the camera converged
+twice as fast at 60 fps as at 30.
+
+```python
+renderer.camera.follow(x, y, map_width=w, map_height=h)         # 0.4.x — warned
+renderer.camera.follow(x, y, map_width=w, map_height=h, dt=dt)  # 0.5.0
+```
+
+Everything else is additive: scenes, entity groups, audio, player seats, and
+UI theming. Widget colors now default from `DEFAULT_THEME`, which carries
+exactly the old hardcoded values — a game that never mentions themes renders
+identically.
 
 ## Upgrading from 0.3.x
 
@@ -134,7 +153,8 @@ package — clone the repo to run them.
 | `examples/tilemap_demo.py` | Walk around a larger map |
 | `examples/sprite_demo.py` | Animated character sprites |
 | `examples/rpg_demo.py` | NPCs, dialogue, menus, HUD |
-| `examples/game_template.py` | Full game starting point |
+| `examples/game_template.py` | The reference wiring: scene stack, entity group, pause + dialogue |
+| `examples/two_player_demo.py` | Player seats, join-by-press, hotplug — zero hardware |
 | `examples/magma_hub_demo.py` | I2C controller input |
 | `examples/hello.mgs` | The same demo written in magmascript |
 | `examples/sim_input.mgs` | A simulated Magma Hub driving a game |
@@ -268,6 +288,47 @@ game.start()
 game = Game(width=640, height=480, root=my_frame)
 ```
 
+### Scenes
+
+Modality as a stack instead of a pile of flags: pushing a scene freezes the
+scenes below it *by construction* — no `paused` global, no early-return chain.
+A scene is anything with `update(dt)` and `render()`; there is no base class.
+
+```python
+from texastoast import SceneStack
+
+stack = SceneStack()
+
+class WorldScene:
+    def update(self, dt): ...
+    def render(self): ...
+    def handle_key(self, event):            # optional — receives key events
+        if event.keysym == "Escape":
+            stack.push(PauseScene())        # world freezes; no flag exists
+            return True
+
+class PauseScene:
+    render_below = True                     # the frozen world stays visible
+    def on_enter(self): menu.show([...])    # optional lifecycle hooks
+    def on_exit(self): menu.hide()
+    def update(self, dt): ...
+    def render(self): menu.render()
+    def handle_key(self, event): ...        # top scene gets the keys
+
+# The stack is a system you wire, not a framework that owns you:
+stack.push(WorldScene())
+game.set_update(stack.update)
+game.set_render(stack.render)
+game.bind_key("<Key>", stack.dispatch_key)
+```
+
+Optional per-scene attributes: `update_below` / `render_below` (the scene
+underneath keeps updating / rendering — for translucent overlays), and hooks
+`on_enter` / `on_exit` / `on_pause` / `on_resume`. Stack operations
+(`push`/`pop`/`replace`/`clear`) are deferred to the next frame, so a scene
+can pop itself mid-update safely. See `examples/game_template.py` for the
+full pattern.
+
 ### Rendering
 
 ```python
@@ -285,7 +346,7 @@ renderer.draw_image(x, y, photo_image)
 renderer.draw_text(x, y, text)                  # world space, follows the camera
 renderer.draw_hud_text(x, y, text, fill="#fff") # screen space, ignores the camera
 
-# Camera — pass dt; omitting it is deprecated and becomes an error in 0.5.0
+# Camera — dt is required (as of 0.5.0), so easing is frame-rate independent
 renderer.camera.follow(target_x, target_y, map_width=800, map_height=600, dt=dt)
 renderer.camera.set_position(x, y)
 renderer.camera.world_to_screen(wx, wy)
@@ -330,6 +391,27 @@ Collision resolves each axis separately, so entities slide along walls rather
 than sticking. A blocked entity stops flush against the wall, and fast movement
 is sub-stepped so nothing tunnels through a tile.
 
+```python
+from texastoast import EntityGroup
+
+# The group drives updates; rendering stays yours.
+entities = EntityGroup()
+player = entities.add(Entity(x=60, y=60), "player")   # returns the entity
+entities.add(Entity(x=100, y=40), "npc", "vendor")
+
+entities.update(dt)              # calls update(dt) on every member
+entities.by_tag("npc")           # -> list
+entities.select(lambda e: e.x > 80)
+for e in entities.sorted_by_y(): # painter's order, by feet line
+    renderer.draw_rect(e.x, e.y, e.width, e.height, "#e94560")
+
+npc.alive = False                # dies inside its own update(); culled after
+entities.remove(npc)             # or external despawn — both safe mid-update
+```
+
+Membership is duck-typed — anything with `update(dt)` qualifies, so timers
+and particles fit without inheriting from `Entity`.
+
 ### Input
 
 ```python
@@ -359,6 +441,52 @@ def update(dt):
         interact()
     prev = state
 ```
+
+#### Player seats (multi-controller)
+
+```python
+from texastoast import PlayerManager
+
+manager = PlayerManager(max_players=2,
+                        on_join=lambda p: print(f"P{p.index + 1} joined"),
+                        on_leave=lambda p: print(f"P{p.index + 1} left"))
+manager.add_source(keyboard)     # the keyboard is a claimable seat too
+manager.add_hub(poller)          # one seat candidate per hub controller
+
+def update(dt):
+    manager.update()             # join scan + hotplug watch, once per frame
+    for player in manager.joined_players:
+        state = player.poll()    # a Player IS an InputSource
+        ...
+```
+
+Joining is edge-triggered (a fresh A/Start press claims the first free seat).
+When a controller disconnects its seat goes inactive and polls **idle** — not
+stuck on whatever was held — and when it comes back it reclaims the *same*
+seat, so a bounced cable never reshuffles who is P1 and who is P2.
+
+### Audio
+
+```python
+from texastoast import Mixer
+
+mixer = Mixer()                  # best backend available; never raises
+game.on_close(mixer.close)
+
+mixer.load("jump", "assets/jump.wav")
+mixer.load("theme", "assets/theme.wav", volume=0.6)
+mixer.play_music("theme")        # one music slot, loops
+mixer.play("jump")               # fire-and-forget SFX
+mixer.set_master_volume(0.8)
+mixer.backend_name               # "pygame" | "winsound" | "aplay" | "afplay" | "null"
+```
+
+Backends degrade like everything else in the engine: `pip install
+"texastoast[audio]"` gets pygame-ce's real mixer; without it the platform's
+basic player is used (SFX-grade); with nothing available every call is a
+silent no-op and the game runs identically. **WAV is the guaranteed format**
+on every tier. A missing sound file logs a warning and plays as silence — an
+absent asset must not kill the game.
 
 ### I2C
 
@@ -433,6 +561,20 @@ All three widgets draw from your render function, so a renderer that clears the
 canvas each frame puts them back. Call `render()` unconditionally — it is a
 no-op when the widget is not showing.
 
+```python
+# Theming — one object instead of per-widget color kwargs
+from dataclasses import replace
+from texastoast import DEFAULT_THEME, Theme
+
+ocean = replace(DEFAULT_THEME, primary="#4fc3f7", selection_fill="#112233")
+dialogue = DialogueBox(renderer, theme=ocean)
+menu = Menu(renderer, theme=ocean)
+hud = HUD(renderer, theme=ocean)
+```
+
+`DEFAULT_THEME` carries exactly the pre-0.5.0 hardcoded values, and explicit
+style kwargs still beat the theme, so existing games render unchanged.
+
 ## Scripting with magmascript
 
 texastoast publishes itself to [magmascript](https://github.com/magmacrunchmedia/magmascript)
@@ -489,6 +631,11 @@ The hardware layer is scriptable too: `tt.hub()`, `tt.hubs()` (scan),
 [examples/sim_input.mgs](examples/sim_input.mgs) for a simulated hub driving a
 game. UI factories accept the renderer in place of the game —
 `tt.dialogue(r)` — and then inherit its dimensions.
+
+0.5.0 adds the structure factories: `tt.scenes()` (a `SceneStack` the script
+wires itself), `tt.entities()`, `tt.sprite_sheet(path, fw, fh)`,
+`tt.theme({"primary": "#4fc3f7"})`, `tt.mixer()` (wire `g.on_close(m.close)`),
+and `tt.players({"max_players": 2})`. UI factories take a `"theme"` option.
 
 Needs magmascript 3.2 or newer. See [examples/hello.mgs](examples/hello.mgs).
 
