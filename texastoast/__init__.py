@@ -1,6 +1,6 @@
 """texastoast — Python RPG engine and Magma Hub I2C layer."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 def __getattr__(name):
