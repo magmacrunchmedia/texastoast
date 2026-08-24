@@ -20,6 +20,10 @@ def __getattr__(name):
         from texastoast.input import InputState, KeyboardInput
         return {"InputState": InputState, "KeyboardInput": KeyboardInput}[name]
 
+    if name in ("DialogueBox", "Menu", "HUD"):
+        from texastoast.ui import DialogueBox, Menu, HUD
+        return {"DialogueBox": DialogueBox, "Menu": Menu, "HUD": HUD}[name]
+
     raise AttributeError(f"module 'texastoast' has no attribute {name!r}")
 
 
@@ -35,4 +39,7 @@ __all__ = [
     "AABB",
     "InputState",
     "KeyboardInput",
+    "DialogueBox",
+    "Menu",
+    "HUD",
 ]
