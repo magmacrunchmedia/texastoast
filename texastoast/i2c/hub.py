@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 from texastoast.i2c.bus import I2CBus
 from texastoast.i2c.protocol import (
     CONTROLLER_SIZE,
-    BUTTONS_ADDR,
-    JOYSTICK_ADDR,
-    ControllerState,
     DEFAULT_HUB_ADDRESSES,
+    ControllerState,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,6 +45,11 @@ class MagmaHub:
 
     @property
     def connected(self) -> bool:
+        """Whether the last :meth:`poll` actually read a controller.
+
+        ``False`` until a successful poll, and ``False`` again as soon as reads
+        start failing or the bus is mock.
+        """
         return self._connected
 
     def poll(self) -> list[ControllerState]:
@@ -59,20 +61,23 @@ class MagmaHub:
 
         self._last_poll = now
 
+        any_ok = False
         for i in range(self._num_controllers):
             try:
                 start_addr = i * CONTROLLER_SIZE
                 data = self._read_block(start_addr, CONTROLLER_SIZE)
-                if data and len(data) >= CONTROLLER_SIZE:
+                if data is not None and len(data) >= CONTROLLER_SIZE:
                     self._states[i] = ControllerState(
                         buttons=data[0],
                         joystick=data[1],
                     )
-                    self._connected = True
+                    any_ok = True
             except Exception as e:
                 logger.debug(f"Hub 0x{self._address:02x} ctrl {i} read error: {e}")
-                self._connected = False
 
+        # Connected if *any* controller answered. Assigned once, after the loop:
+        # assigning per-controller let the last one overwrite the others.
+        self._connected = any_ok
         return self._states
 
     def get_controller(self, index: int) -> ControllerState:
@@ -80,10 +85,14 @@ class MagmaHub:
             return self._states[index]
         return ControllerState()
 
-    def _read_block(self, start_addr: int, num_bytes: int) -> list[int]:
-        """Read block from hub using the magma protocol."""
+    def _read_block(self, start_addr: int, num_bytes: int) -> list[int] | None:
+        """Read a block from the hub using the magma protocol.
+
+        Returns ``None`` when the read fails or the bus is mock, so that
+        :meth:`poll` can tell "no hardware" apart from "all buttons released".
+        """
         if self._bus.is_mock:
-            return [0x00] * num_bytes
+            return None
 
         try:
             # Protocol: write [start_addr, num_bytes], then read
@@ -96,7 +105,7 @@ class MagmaHub:
             )
         except Exception as e:
             logger.debug(f"I2C read block error: {e}")
-            return [0x00] * num_bytes
+            return None
 
     @classmethod
     def scan_buses(cls, bus_numbers: list[int] = None,
@@ -119,10 +128,16 @@ class MagmaHub:
             found = bus.scan()
             logger.info(f"Bus {bus_num} scan: {[f'0x{a:02x}' for a in found]}")
 
+            claimed = False
             for addr in found:
                 if addr in addresses:
                     hub = cls(addr, bus, num_controllers=num_controllers)
                     hubs.append(hub)
+                    claimed = True
                     logger.info(f"Found Magma Hub at 0x{addr:02x}")
+
+            # Only the hubs we return keep the bus alive; otherwise close it.
+            if not claimed:
+                bus.close()
 
         return hubs

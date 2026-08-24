@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Optional
 
 from texastoast.render.camera import Camera
 
@@ -26,7 +25,13 @@ class CanvasRenderer:
     def clear(self):
         self._canvas.delete("all")
 
-    def draw_tilemap(self, tilemap, tile_colors: dict[int, str]):
+    def draw_tilemap(self, tilemap, tile_colors: dict[int, str],
+                     skip_tiles: set[int] | None = None):
+        """Draw the visible region of ``tilemap``.
+
+        A tile is drawn when its id has an entry in ``tile_colors``; ids that
+        are absent are left transparent, as are any listed in ``skip_tiles``.
+        """
         cam = self._camera
         ts = tilemap.tile_size
 
@@ -38,9 +43,11 @@ class CanvasRenderer:
         for row in range(start_row, end_row):
             for col in range(start_col, end_col):
                 tile_id = tilemap.get(col, row)
-                if tile_id == 0:
+                if skip_tiles is not None and tile_id in skip_tiles:
                     continue
-                color = tile_colors.get(tile_id, "#ffffff")
+                color = tile_colors.get(tile_id)
+                if color is None:
+                    continue
                 x1 = col * ts - cam.x
                 y1 = row * ts - cam.y
                 x2 = x1 + ts

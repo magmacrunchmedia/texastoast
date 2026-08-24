@@ -8,12 +8,11 @@ with keyboard input.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 try:
-    from smbus2 import SMBus, i2c_msg
+    from smbus2 import SMBus
     HAS_SMBUS = True
 except ImportError:
     HAS_SMBUS = False
@@ -25,7 +24,7 @@ class I2CBus:
 
     def __init__(self, bus_number: int = 1):
         self._bus_number = bus_number
-        self._bus: Optional[object] = None
+        self._bus: object | None = None
         self._mock = not HAS_SMBUS
         self._open()
 
@@ -54,14 +53,20 @@ class I2CBus:
     def bus_number(self) -> int:
         return self._bus_number
 
-    def read_byte_data(self, address: int, register: int) -> int:
+    def read_byte_data(self, address: int, register: int) -> int | None:
+        """Read one byte. Returns ``None`` if the read failed or the bus is mock.
+
+        A failed read must be distinguishable from a device that genuinely
+        reported 0x00, otherwise callers cannot tell whether hardware is
+        present at all.
+        """
         if self._mock:
-            return 0x00
+            return None
         try:
             return self._bus.read_byte_data(address, register)
         except OSError as e:
             logger.debug(f"I2C read error at 0x{address:02x}: {e}")
-            return 0x00
+            return None
 
     def write_byte_data(self, address: int, register: int, value: int):
         if self._mock:
@@ -71,14 +76,17 @@ class I2CBus:
         except OSError as e:
             logger.debug(f"I2C write error at 0x{address:02x}: {e}")
 
-    def read_i2c_block_data(self, address: int, register: int, length: int) -> list[int]:
+    def read_i2c_block_data(self, address: int, register: int,
+                            length: int) -> list[int] | None:
+        """Read a block of bytes. Returns ``None`` if the read failed or the
+        bus is mock. See :meth:`read_byte_data` for why."""
         if self._mock:
-            return [0x00] * length
+            return None
         try:
             return self._bus.read_i2c_block_data(address, register, length)
         except OSError as e:
             logger.debug(f"I2C block read error at 0x{address:02x}: {e}")
-            return [0x00] * length
+            return None
 
     def write_i2c_block_data(self, address: int, register: int, data: list[int]):
         if self._mock:

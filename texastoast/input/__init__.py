@@ -1,4 +1,4 @@
-from texastoast.input.abstract import InputState, InputSource
+from texastoast.input.abstract import InputSource, InputState
 
 __all__ = ["InputState", "InputSource", "KeyboardInput", "MagmaHubInput", "CompositeInput"]
 

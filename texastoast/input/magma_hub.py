@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-from texastoast.input.abstract import InputState
 from texastoast.i2c.hub import MagmaHub
+from texastoast.input.abstract import InputState
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class CompositeInput:
     """Combines keyboard and Magma Hub input — falls back to keyboard
     when no hub is connected."""
 
-    def __init__(self, keyboard=None, hub_input: Optional[MagmaHubInput] = None):
+    def __init__(self, keyboard=None, hub_input: MagmaHubInput | None = None):
         self._keyboard = keyboard
         self._hub_input = hub_input
 

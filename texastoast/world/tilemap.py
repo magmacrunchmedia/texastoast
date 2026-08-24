@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 
 class TileMap:
@@ -12,14 +11,14 @@ class TileMap:
         self,
         grid: list[list[int]],
         tile_size: int = 16,
-        solid_tiles: Optional[set[int]] = None,
+        solid_tiles: set[int] | None = None,
     ):
         self._grid = grid
         self._tile_size = tile_size
         self._solid_tiles = solid_tiles if solid_tiles is not None else set()
 
     @classmethod
-    def from_file(cls, path: str | Path, tile_size: Optional[int] = None, solid_tiles: Optional[set[int]] = None) -> TileMap:
+    def from_file(cls, path: str | Path, tile_size: int | None = None, solid_tiles: set[int] | None = None) -> TileMap:
         with open(path) as f:
             data = json.load(f)
         ts = tile_size if tile_size is not None else data.get("tile_size", 16)
@@ -75,7 +74,7 @@ class TileMap:
     def to_grid_coords(self, world_x: float, world_y: float) -> tuple[int, int]:
         return int(world_x // self._tile_size), int(world_y // self._tile_size)
 
-    def save(self, path: str | Path, solid_tiles: Optional[set[int]] = None):
+    def save(self, path: str | Path, solid_tiles: set[int] | None = None):
         data = {
             "grid": self._grid,
             "tile_size": self._tile_size,

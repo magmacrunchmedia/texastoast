@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,11 @@ class GameLoop:
     def stop(self):
         self._running = False
         if self._after_id is not None:
-            self._root.after_cancel(self._after_id)
+            try:
+                self._root.after_cancel(self._after_id)
+            except Exception:
+                # Root may already be torn down; nothing left to cancel.
+                pass
             self._after_id = None
 
     def _tick(self):
@@ -73,4 +77,11 @@ class GameLoop:
             self._frame_count = 0
             self._fps_timer = now
 
-        self._after_id = self._root.after(self._interval_ms, self._tick)
+        if not self._running:  # stop() may have been called from update/render
+            return
+
+        # Subtract the time update/render just spent, otherwise every frame
+        # costs interval + work and the target fps is never reached.
+        work_ms = (time.monotonic() - now) * 1000.0
+        delay = max(1, int(self._interval_ms - work_ms))
+        self._after_id = self._root.after(delay, self._tick)

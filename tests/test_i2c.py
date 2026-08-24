@@ -1,18 +1,23 @@
 from texastoast.i2c.bus import I2CBus
 from texastoast.i2c.hub import MagmaHub
 from texastoast.i2c.protocol import (
-    ControllerState, CONTROLLER_SIZE,
-    BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT,
-    BTN_A, BTN_B, BTN_START, BTN_SELECT,
+    BTN_A,
+    BTN_DOWN,
+    BTN_LEFT,
+    BTN_UP,
+    ControllerState,
 )
-from texastoast.input.magma_hub import MagmaHubInput, CompositeInput
+from texastoast.input.abstract import InputState
+from texastoast.input.magma_hub import CompositeInput, MagmaHubInput
 
 
-def test_i2cbus_mock():
+def test_i2cbus_mock_reads_report_failure():
+    # A mock bus must not fabricate 0x00 data: callers have to be able to tell
+    # "no hardware" apart from "a device that reported zero".
     bus = I2CBus(99)
     assert bus.is_mock is True
-    assert bus.read_byte_data(0x08, 0) == 0x00
-    assert bus.read_i2c_block_data(0x08, 0, 2) == [0x00, 0x00]
+    assert bus.read_byte_data(0x08, 0) is None
+    assert bus.read_i2c_block_data(0x08, 0, 2) is None
     bus.close()
 
 
@@ -65,6 +70,24 @@ def test_magma_hub_input():
     assert state.a is False
 
 
+def test_mock_hub_is_never_connected():
+    # Regression: poll() used to set connected=True on a mock bus, because a
+    # failed read was indistinguishable from an all-zero controller report.
+    bus = I2CBus(99)
+    hub = MagmaHub(0x08, bus, num_controllers=1)
+    assert hub.connected is False
+    hub.poll()
+    assert hub.connected is False
+
+
+def test_multi_controller_connected_is_not_last_write_wins():
+    bus = I2CBus(99)
+    hub = MagmaHub(0x08, bus, num_controllers=4)
+    hub.poll()
+    assert hub.connected is False
+    assert len(hub.poll()) == 4
+
+
 def test_composite_input_fallback():
     bus = I2CBus(99)
     hub = MagmaHub(0x08, bus, num_controllers=1)
@@ -76,6 +99,26 @@ def test_composite_input_fallback():
     # poll() should not crash even with keyboard=None
     state = composite.poll()
     assert state.up is False
+
+
+def test_dead_hub_does_not_swallow_keyboard_input():
+    # Regression: a hub on a mock/dead bus reported connected, so CompositeInput
+    # latched onto it and the keyboard stopped reaching the game entirely.
+    class FakeKeyboard:
+        def poll(self):
+            return InputState(right=True)
+
+        def is_pressed(self, button):
+            return button == "right"
+
+    bus = I2CBus(99)
+    hub = MagmaHub(0x08, bus, num_controllers=1)
+    composite = CompositeInput(FakeKeyboard(), MagmaHubInput(hub))
+
+    hub.poll()  # the poll that used to flip connected to True
+    assert composite.active_source == "keyboard"
+    assert composite.poll().right is True
+    assert composite.is_pressed("right") is True
 
 
 def test_composite_input_no_hub():
