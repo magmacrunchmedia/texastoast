@@ -14,9 +14,9 @@ The status bar shows which input source is active and the raw
 button/joystick bytes from the Magma Hub.
 """
 
-from texastoast import Game, CanvasRenderer, KeyboardInput
-from texastoast.input.magma_hub import CompositeInput
+from texastoast import CanvasRenderer, Game, KeyboardInput
 from texastoast.i2c import I2CBus, MagmaHub
+from texastoast.input.magma_hub import CompositeInput, MagmaHubInput
 
 # ── Setup ───────────────────────────────────────────────────────────
 
@@ -37,7 +37,6 @@ if not bus.is_mock:
 else:
     print("I2C not available — using keyboard only")
 
-from texastoast.input.magma_hub import MagmaHubInput
 hub_input = MagmaHubInput(hub, controller_index=0) if hub else None
 controls = CompositeInput(keyboard, hub_input)
 

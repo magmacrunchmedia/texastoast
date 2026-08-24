@@ -9,7 +9,8 @@ On systems without Pillow, it falls back to colored rectangles.
 """
 
 import tkinter as tk
-from texastoast import Game, CanvasRenderer, KeyboardInput
+
+from texastoast import CanvasRenderer, Game, KeyboardInput
 from texastoast.ui import HUD
 
 # ── Procedural sprite generation ────────────────────────────────────
@@ -32,7 +33,7 @@ def create_character_sheet(root) -> list[list[tk.PhotoImage]]:
     frames = [[], [], []]  # down, right, up
 
     if HAS_PIL:
-        img = Image.new("RGBA", (SPRITE_SHEET_W, sprite_sheet_h := SPRITE_SHEET_H), (0, 0, 0, 0))
+        img = Image.new("RGBA", (SPRITE_SHEET_W, SPRITE_SHEET_H), (0, 0, 0, 0))
         from PIL import ImageDraw
         draw = ImageDraw.Draw(img)
 
@@ -52,19 +53,12 @@ def create_character_sheet(root) -> list[list[tk.PhotoImage]]:
                 draw.rectangle([x+5, y+13, x+7, y+15], fill=colors[row])
                 draw.rectangle([x+9, y+13, x+11, y+15 + leg_offset], fill=colors[row])
 
-        tk_image = ImageTk.PhotoImage(img)
-
         for row in range(3):
             for col in range(ANIM_FRAMES):
                 x = col * FRAME_W
                 y = row * FRAME_H
-                frame = tk_image.subsample(1, 1)
-                # Use copy with crop region
-                f = img.crop((x, y, x + FRAME_W, y + FRAME_H))
-                frames[row].append(ImageTk.PhotoImage(f))
-
-        # Keep reference
-        frames._tk_image = tk_image  # type: ignore
+                cropped = img.crop((x, y, x + FRAME_W, y + FRAME_H))
+                frames[row].append(ImageTk.PhotoImage(cropped))
     else:
         # Fallback: colored rectangles
         colors = ["#e94560", "#4fc3f7", "#66bb6a"]
@@ -89,7 +83,8 @@ renderer = CanvasRenderer(game.canvas, 400, 300)
 keyboard = KeyboardInput(game.root)
 hud = HUD(game.canvas, 400, 300)
 
-# Generate sprites
+# Generate sprites. `sheets` is the only reference keeping these PhotoImages
+# alive — tkinter images vanish from the canvas once they are garbage collected.
 sheets = create_character_sheet(game.root)
 
 # Player state

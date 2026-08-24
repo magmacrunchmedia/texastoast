@@ -1,6 +1,6 @@
 """Tilemap demo — walk around a larger map with walls."""
 
-from texastoast import Game, CanvasRenderer, TileMap, Entity, KeyboardInput
+from texastoast import CanvasRenderer, Entity, Game, KeyboardInput, TileMap
 
 # A bigger map with an interesting layout
 grid = [
@@ -28,12 +28,12 @@ keyboard = KeyboardInput(game.root)
 tilemap = TileMap(grid, tile_size=16, solid_tiles={1})
 TILE_COLORS = {0: "#7cb342", 1: "#5d4037"}
 
-player = Entity(x=48, y=48, width=12, height=12, speed=100)
+player = Entity(x=48, y=24, width=12, height=12, speed=100)
 
 
 def update(dt):
     state = keyboard.poll()
-    player.move(state.dx, state.dy, tilemap)
+    player.move(state.dx, state.dy, dt, tilemap)
     renderer.camera.follow(
         player.center_x, player.center_y,
         map_width=tilemap.width, map_height=tilemap.height,

@@ -1,6 +1,6 @@
 """Minimal texastoast example — a colored square you can move with arrow keys."""
 
-from texastoast import Game, CanvasRenderer, TileMap, Entity, KeyboardInput
+from texastoast import CanvasRenderer, Entity, Game, KeyboardInput, TileMap
 
 # --- Setup ---
 game = Game(title="texastoast hello", width=320, height=240, fps=30)
@@ -32,7 +32,7 @@ player = Entity(x=48, y=48, width=12, height=12, speed=100)
 # --- Update ---
 def update(dt: float):
     state = keyboard.poll()
-    player.move(state.dx, state.dy, tilemap)
+    player.move(state.dx, state.dy, dt, tilemap)
     renderer.camera.follow(
         player.center_x, player.center_y,
         map_width=tilemap.width, map_height=tilemap.height,

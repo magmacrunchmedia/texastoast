@@ -13,8 +13,8 @@ This demonstrates the full feature set:
 Copy this file and modify it to build your own game.
 """
 
-from texastoast import Game, CanvasRenderer, TileMap, Entity, KeyboardInput
-from texastoast.ui import DialogueBox, Menu, HUD
+from texastoast import CanvasRenderer, Entity, Game, KeyboardInput, TileMap
+from texastoast.ui import HUD, DialogueBox, Menu
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -159,7 +159,7 @@ def update(dt):
         return
 
     state = keyboard.poll()
-    player.move(state.dx, state.dy, tilemap)
+    player.move(state.dx, state.dy, dt, tilemap)
     renderer.camera.follow(
         player.center_x, player.center_y,
         map_width=tilemap.width, map_height=tilemap.height,

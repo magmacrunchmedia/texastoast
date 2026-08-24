@@ -5,25 +5,35 @@ from __future__ import annotations
 
 import json
 import tkinter as tk
-from tkinter import colorchooser, filedialog, messagebox
-from dataclasses import dataclass, field
-from typing import Optional
-
+from dataclasses import dataclass
+from tkinter import filedialog, messagebox
 
 # ── Defaults ────────────────────────────────────────────────────────
 
 DEFAULT_COLS = 20
 DEFAULT_ROWS = 15
 DEFAULT_TILE_SIZE = 24
-DEFAULT_PALETTES = {
-    0: ("empty", "#7cb342"),
-    1: ("wall", "#5d4037"),
-    2: ("water", "#1e88e5"),
-    3: ("path", "#fdd835"),
-    4: ("door", "#e94560"),
-    5: ("chest", "#ff9800"),
-    6: ("npc", "#ab47bc"),
-    7: ("sign", "#78909c"),
+
+
+@dataclass
+class Tile:
+    """One palette entry: how a tile id looks and whether it blocks movement."""
+    name: str
+    color: str
+    solid: bool = False
+
+
+# Whether a tile blocks movement is a property of the tile, not of "is it
+# non-zero" — grass, paths, NPCs and signs are all walkable.
+DEFAULT_PALETTES: dict[int, Tile] = {
+    0: Tile("empty", "#7cb342", solid=False),
+    1: Tile("wall", "#5d4037", solid=True),
+    2: Tile("water", "#1e88e5", solid=True),
+    3: Tile("path", "#fdd835", solid=False),
+    4: Tile("door", "#e94560", solid=False),
+    5: Tile("chest", "#ff9800", solid=False),
+    6: Tile("npc", "#ab47bc", solid=False),
+    7: Tile("sign", "#78909c", solid=False),
 }
 
 
@@ -43,11 +53,14 @@ class TileEditor:
         self._cols = DEFAULT_COLS
         self._rows = DEFAULT_ROWS
         self._tile_size = DEFAULT_TILE_SIZE
-        self._palette: dict[int, tuple[str, str]] = dict(DEFAULT_PALETTES)
+        self._palette: dict[int, Tile] = {
+            tid: Tile(t.name, t.color, t.solid)
+            for tid, t in DEFAULT_PALETTES.items()
+        }
         self._selected_id = 1
         self._show_grid = True
         self._painting = False
-        self._file_path: Optional[str] = None
+        self._file_path: str | None = None
 
         self._grid: list[list[int]] = [
             [0] * self._cols for _ in range(self._rows)
@@ -143,24 +156,43 @@ class TileEditor:
         for widget in self._palette_frame.winfo_children():
             widget.destroy()
 
-        for tile_id, (name, color) in sorted(self._palette.items()):
+        self._solid_vars: dict[int, tk.BooleanVar] = {}
+        for tile_id, tile in sorted(self._palette.items()):
             frame = tk.Frame(self._palette_frame, bg="#2b2b2b")
             frame.pack(fill=tk.X, pady=1)
 
-            btn = tk.Button(frame, bg=color, width=3, height=1,
+            btn = tk.Button(frame, bg=tile.color, width=3, height=1,
                             relief=tk.SUNKEN if tile_id == self._selected_id else tk.RAISED,
                             command=lambda tid=tile_id: self._select_tile(tid))
             btn.pack(side=tk.LEFT, padx=(0, 4))
 
-            label_text = f"{tile_id}: {name}"
+            label_text = f"{tile_id}: {tile.name}"
             tk.Label(frame, text=label_text, bg="#2b2b2b", fg="#cccccc",
                      font=("Courier", 9), anchor=tk.W).pack(side=tk.LEFT)
+
+            var = tk.BooleanVar(value=tile.solid)
+            self._solid_vars[tile_id] = var
+            tk.Checkbutton(
+                frame, text="solid", variable=var, bg="#2b2b2b", fg="#888888",
+                selectcolor="#1a1a1a", activebackground="#2b2b2b",
+                activeforeground="#cccccc", font=("Courier", 8),
+                command=lambda tid=tile_id: self._toggle_solid(tid),
+            ).pack(side=tk.RIGHT)
 
     def _select_tile(self, tile_id: int):
         self._selected_id = tile_id
         self._build_palette()
-        name, _ = self._palette.get(tile_id, ("?", "#000000"))
+        tile = self._palette.get(tile_id)
+        name = tile.name if tile else "?"
         self._status.config(text=f"Selected: {tile_id} ({name})")
+
+    def _toggle_solid(self, tile_id: int):
+        tile = self._palette.get(tile_id)
+        if tile is None:
+            return
+        tile.solid = self._solid_vars[tile_id].get()
+        state = "solid" if tile.solid else "walkable"
+        self._status.config(text=f"{tile_id} ({tile.name}) is now {state}")
 
     # ── Drawing ─────────────────────────────────────────────────────
 
@@ -185,10 +217,10 @@ class TileEditor:
 
     def _get_tile_color(self, tile_id: int) -> str:
         if tile_id in self._palette:
-            return self._palette[tile_id][1]
+            return self._palette[tile_id].color
         return f"#{(tile_id * 37) % 256:02x}{(tile_id * 73) % 256:02x}{(tile_id * 113) % 256:02x}"
 
-    def _tile_at(self, event) -> Optional[tuple[int, int]]:
+    def _tile_at(self, event) -> tuple[int, int] | None:
         col = int(event.x // self._tile_size)
         row = int(event.y // self._tile_size)
         if 0 <= col < self._cols and 0 <= row < self._rows:
@@ -237,8 +269,10 @@ class TileEditor:
         if tile:
             col, row = tile
             tile_id = self._grid[row][col]
-            name = self._palette.get(tile_id, ("?",))[0]
-            self._status.config(text=f"({col}, {row}) tile={tile_id} ({name})")
+            tile = self._palette.get(tile_id)
+            name = tile.name if tile else "?"
+            solid = " solid" if tile and tile.solid else ""
+            self._status.config(text=f"({col}, {row}) tile={tile_id} ({name}){solid}")
         else:
             self._status.config(text="Ready")
 
@@ -294,14 +328,22 @@ class TileEditor:
             with open(path) as f:
                 data = json.load(f)
             grid = data["grid"]
+            if not isinstance(grid, list) or not all(isinstance(r, list) for r in grid):
+                raise ValueError("'grid' must be a list of rows")
+
             self._rows = len(grid)
-            self._cols = len(grid[0]) if grid else 0
-            self._grid = grid
+            self._cols = max((len(r) for r in grid), default=0)
+            # Pad ragged rows: every row is indexed up to _cols when painting.
+            self._grid = [list(r) + [0] * (self._cols - len(r)) for r in grid]
             self._tile_size = data.get("tile_size", 16)
-            if "solid_tiles" in data:
-                for tid in data["solid_tiles"]:
-                    if tid not in self._palette:
-                        self._palette[tid] = (f"tile_{tid}", self._get_tile_color(tid))
+
+            saved_solid = set(data.get("solid_tiles", []))
+            for tid in {t for row in self._grid for t in row} | saved_solid:
+                if tid not in self._palette:
+                    self._palette[tid] = Tile(f"tile_{tid}", self._get_tile_color(tid))
+            for tid, tile in self._palette.items():
+                tile.solid = tid in saved_solid
+            self._build_palette()
             self._file_path = path
             self._history.clear()
             self._redo_stack.clear()
@@ -329,11 +371,13 @@ class TileEditor:
         self._do_save(path)
 
     def _do_save(self, path: str):
-        solid_tiles = []
-        for row in self._grid:
-            for tid in row:
-                if tid not in solid_tiles and tid != 0:
-                    solid_tiles.append(tid)
+        # Solidity comes from the palette. Treating every non-zero id as solid
+        # turned grass, paths and NPCs into walls the player could not cross.
+        used = {tid for row in self._grid for tid in row}
+        solid_tiles = sorted(
+            tid for tid in used
+            if tid in self._palette and self._palette[tid].solid
+        )
         data = {
             "grid": self._grid,
             "tile_size": self._tile_size,
