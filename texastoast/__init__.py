@@ -1,4 +1,4 @@
-"""texastoast — Python RPG engine and Magma Hub I2C layer."""
+"""texastoast — Python RPG engine with I2C hardware abstraction."""
 
 __version__ = "0.1.2"
 

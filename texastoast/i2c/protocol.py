@@ -1,4 +1,4 @@
-"""Magma Hub I2C protocol constants and memory layout."""
+"""I2C protocol constants and controller state parsing."""
 
 from __future__ import annotations
 

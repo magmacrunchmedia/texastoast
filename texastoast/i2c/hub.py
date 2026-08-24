@@ -1,4 +1,4 @@
-"""MagmaHub — abstracts one or more controllers on an I2C slave Pico."""
+"""I2C hub abstraction — reads controller state from I2C slave devices."""
 
 from __future__ import annotations
 

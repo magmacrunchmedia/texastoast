@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "texastoast"
 version = "0.1.2"
-description = "Python RPG engine and Magma Hub I2C layer for magmacrunch game systems"
+description = "Python RPG engine with I2C hardware abstraction for magmacrunch game systems"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"

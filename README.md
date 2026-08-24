@@ -1,8 +1,8 @@
 # texastoast
 
-Python RPG engine and Magma Hub I2C layer for magmacrunch game systems.
+Python RPG engine with I2C hardware abstraction for magmacrunch game systems.
 
-A tkinter-based 2D game engine inspired by [adenosine](https://github.com/magmacrunchmedia/adenosine), with I2C hardware abstraction for Raspberry Pi + Pico "Magma Hub" controllers.
+A tkinter-based 2D game engine inspired by [adenosine](https://github.com/magmacrunchmedia/adenosine), with optional I2C support for Raspberry Pi hardware.
 
 ## Install
 
@@ -125,13 +125,15 @@ state.dx, state.dy                               # float (-1, 0, 1)
 state.is_any_direction()                         # bool
 ```
 
-### I2C (Magma Hub)
+### I2C
+
+Optional I2C support for connecting hardware controllers via Raspberry Pi.
 
 ```python
 from texastoast import I2CBus, MagmaHub, MagmaHubInput, CompositeInput
 
 # Direct I2C
-bus = I2CBus(1)  # I2C bus number
+bus = I2CBus(1)
 hubs = MagmaHub.scan_buses(bus_numbers=[1])
 hub = hubs[0]
 hub.poll()  # -> [ControllerState, ...]
@@ -172,30 +174,6 @@ hud.add_text("score", "Score: 0", 10, 10, fill="#fdd835")
 hud.set_text("score", "Score: 100")
 hud.render()
 ```
-
-## Magma Hub Hardware
-
-The Magma Hub is a Raspberry Pico acting as an I2C slave, providing controller input (buttons + joystick) to the Pi master. texastoast abstracts this hardware so games don't need to know about I2C details.
-
-### Protocol
-
-| Address | Data | Description |
-|---------|------|-------------|
-| 0x00 | 8-bit | Button status (bitmask) |
-| 0x01 | 8-bit | Joystick status |
-
-### Button Bitmask
-
-| Bit | Button |
-|-----|--------|
-| 0 | Up |
-| 1 | Down |
-| 2 | Left |
-| 3 | Right |
-| 4 | A |
-| 5 | B |
-| 6 | Start |
-| 7 | Select |
 
 ## Design Philosophy
 

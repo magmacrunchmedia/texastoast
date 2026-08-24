@@ -1,4 +1,4 @@
-"""Magma Hub input adapter — same InputProtocol as KeyboardInput."""
+"""I2C input adapter — reads controller state from I2C hub devices."""
 
 from __future__ import annotations
 
