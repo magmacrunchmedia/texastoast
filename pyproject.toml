@@ -39,7 +39,7 @@ tt = "texastoast.mgs:TexastoastDomain"
 texastoast-bench = "texastoast.devtools.bench:main"
 
 [project.urls]
-Homepage = "https://github.com/magmacrunchmedia/texastoast"
+Homepage = "https://magmacrunch.com/ware/texastoast/"
 Source = "https://github.com/magmacrunchmedia/texastoast"
 Issues = "https://github.com/magmacrunchmedia/texastoast/issues"
 Documentation = "https://github.com/magmacrunchmedia/texastoast/wiki"
