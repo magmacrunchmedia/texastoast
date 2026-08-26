@@ -20,7 +20,8 @@ texastoast/             the package (ships py.typed)
   i2c/                  bus, MagmaHub, protocol, SimBus simulator (i2c/sim)
   devtools/             ships in the wheel; bench:main is the texastoast-bench script
   mgs.py                magmascript domain (`texastoast` / `tt` entry points)
-tests/                  pytest, 24 files; display-needing tests skip headless
+tests/                  pytest; display-needing tests skip headless, and the
+                        terminal-backend tests skip without the [tui] extra
 examples/               hello_world.py … game_template.py (the reference wiring),
                         magma_hub_demo.py, *.mgs magmascript demos
 tools/                  tile_editor.py (map editor GUI), controller_bench.py
@@ -30,7 +31,38 @@ pyproject.toml          hatchling; version read from texastoast/__init__.py
 ```
 
 Extras: `[sprites]` Pillow (sheet cropping), `[hardware]` smbus2 (Linux only),
-`[audio]` pygame-ce, `[dev]` pytest + ruff. None are required to run.
+`[audio]` pygame-ce, `[tui]` textual (terminal backend), `[dev]` pytest + ruff.
+None are required to run — `tests/test_no_hard_deps.py` enforces that, and it is
+the reason the terminal host is behind a lazy `__getattr__` in `core/__init__.py`.
+
+## Render backends
+
+The terminal is **not a fourth engine** — it is a second output surface for this
+one. adenosine is the web engine, magnolia the Wii engine, texastoast the Python
+engine; a TUI is a backend under texastoast, and new games get one by targeting
+`render/abstract.py` rather than any particular backend.
+
+| | `render/canvas.py` | `render/tui.py` |
+|---|---|---|
+| host | `core/game.py` (tkinter) | `core/tui_game.py` (Textual) |
+| units | pixels | **character cells** |
+| `present()` | no-op, canvas is retained | **required** — flushes the buffer |
+| `draw_image` | sprite sheets | **no-op**, a grid has no pixels |
+| colors | hex strings | the same hex strings, via Rich |
+
+Three seams keep a backend swappable, and are worth preserving:
+
+- `render/cellbuffer.py` is framework-free — no Textual, no Rich, no curses. It
+  is the half a hand-written ANSI backend reuses verbatim.
+- `core/scheduler.py` names the two methods (`after`/`after_cancel`) that
+  `GameLoop` needs. A tkinter root satisfies it structurally, which is why the
+  loop worked before the protocol existed. `ManualScheduler` drives the loop in
+  tests with no display and no sleeping.
+- `TuiGame` takes its surface and scheduler by **injection**, so a new backend
+  is a constructor argument rather than a second host class.
+
+A custom ANSI backend is a stated long-term goal; it lands as `render/ansi.py`
+plus `core/ansi_game.py` and should require no change to any game.
 
 ## Commands
 
@@ -86,6 +118,11 @@ adenosine/packages/rpg/API.md. Changing the format is a three-repo change.
 
 Here the readers are the sprite support behind the `[sprites]` extra (Pillow does
 the cropping) and the `tt.sprite_sheet(path, fw, fh)` magmascript factory.
+
+The terminal backend does not participate: `TuiRenderer.draw_image` is a
+documented no-op, because a character grid cannot honor the format. That is a
+gap in what a terminal can express, **not** a change to the contract — nothing
+in `render/tui.py` reads or writes a sheet.
 
 ## Publishing / deploy
 

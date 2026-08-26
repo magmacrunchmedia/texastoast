@@ -348,6 +348,44 @@ renderer.draw_hud_text(x, y, text, fill="#fff") # screen space, ignores the came
 
 # Camera — dt is required (as of 0.5.0), so easing is frame-rate independent
 renderer.camera.follow(target_x, target_y, map_width=800, map_height=600, dt=dt)
+```
+
+### Running in a terminal
+
+The same game code runs in a terminal. `TuiRenderer` satisfies the same
+`Renderer`/`UISurface` protocols as `CanvasRenderer`, so a render function
+written against those needs no changes — swap the host.
+
+```bash
+pip install "texastoast[tui]"
+python examples/tui_demo.py
+```
+
+```python
+from texastoast.core.tui_game import TuiGame, TuiInput
+
+game = TuiGame(title="my game", fps=30, input_source=TuiInput(hold_ms=120))
+renderer = game.renderer          # width/height are CHARACTER CELLS, not pixels
+game.set_update(update)
+game.set_render(render)
+game.start()
+```
+
+Four differences worth knowing before you port a game to it:
+
+- **Coordinates are cells.** Terminal cells are about twice as tall as they are
+  wide, so a game converted from a pixel canvas usually doubles its x scale.
+  The backend does not apply that for you — the right factor depends on the
+  game, and baking one game's choice into the renderer would be wrong for the
+  next one.
+- **`present()` actually does something.** On tkinter it is a no-op; here the
+  buffer is off-screen and nothing appears until you call it.
+- **`draw_image` is a no-op.** A character grid has no pixels. Draw glyphs with
+  `draw_text`, or set `renderer.tile_glyphs` for tilemaps.
+- **Terminals report key presses, never releases.** `TuiInput()` defaults to
+  edge semantics — one keystroke, one action, which is what a turn-based game
+  wants. Pass `hold_ms=120` for real-time games to infer a held key from the
+  terminal's auto-repeat.
 renderer.camera.set_position(x, y)
 renderer.camera.world_to_screen(wx, wy)
 renderer.camera.is_visible(x, y, w, h)

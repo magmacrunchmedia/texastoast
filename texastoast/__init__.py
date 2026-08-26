@@ -1,12 +1,19 @@
 """texastoast — Python RPG engine with I2C hardware abstraction."""
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 
 def __getattr__(name):
     if name in ("Config", "GameLoop", "Game"):
         from texastoast.core import Config, Game, GameLoop
         return {"Config": Config, "GameLoop": GameLoop, "Game": Game}[name]
+
+    if name in ("Scheduler", "ManualScheduler", "TuiGame", "GameSurface",
+                "TuiInput", "TextualScheduler"):
+        # getattr, not a from-import: the terminal names live behind core's own
+        # lazy hook so that asking for ManualScheduler does not import Textual.
+        from texastoast import core
+        return getattr(core, name)
 
     if name in ("Scene", "SceneStack"):
         from texastoast import scene
@@ -16,11 +23,12 @@ def __getattr__(name):
         from texastoast.audio import Mixer
         return Mixer
 
-    if name in ("CanvasRenderer", "Camera", "SpriteSheet", "Renderer", "UISurface"):
-        from texastoast.render import Camera, CanvasRenderer, Renderer, SpriteSheet, UISurface
-        return {"CanvasRenderer": CanvasRenderer, "Camera": Camera,
-                "SpriteSheet": SpriteSheet, "Renderer": Renderer,
-                "UISurface": UISurface}[name]
+    if name in ("CanvasRenderer", "Camera", "SpriteSheet", "Renderer", "UISurface",
+                "TuiRenderer", "CellBuffer", "Cell"):
+        # getattr for the same reason as above: a from-import of the group
+        # would pull CanvasRenderer (and tkinter) in to answer for CellBuffer.
+        from texastoast import render
+        return getattr(render, name)
 
     if name in ("TileMap", "Entity", "AABB", "EntityGroup"):
         from texastoast import world
@@ -50,6 +58,12 @@ __all__ = [
     "Config",
     "GameLoop",
     "Game",
+    "Scheduler",
+    "ManualScheduler",
+    "TuiGame",
+    "GameSurface",
+    "TuiInput",
+    "TextualScheduler",
     "Scene",
     "SceneStack",
     "Mixer",
@@ -59,6 +73,9 @@ __all__ = [
     "Theme",
     "DEFAULT_THEME",
     "CanvasRenderer",
+    "TuiRenderer",
+    "CellBuffer",
+    "Cell",
     "Camera",
     "SpriteSheet",
     "Renderer",
