@@ -335,3 +335,101 @@ def test_tui_game_exposes_a_renderer_over_its_surface():
     game.renderer.draw_hud_text(0, 0, "hey")
     game.renderer.present()
     assert game.surface.buffer.to_text().startswith("hey")
+
+
+# ── The shared widgets over a terminal surface ──────────────────────
+#
+# The payoff of TuiRenderer satisfying UISurface: ui/ widgets written for the
+# canvas work here unchanged, given layout metrics in cells rather than pixels.
+
+
+def test_the_menu_widget_renders_over_a_tui_surface():
+    from texastoast.ui import Menu
+
+    renderer = TuiRenderer(40, 14)
+    menu = Menu(renderer, menu_width=30, item_height=1,
+                title_height=2, item_padding=1, border_pad=1)
+    menu.show(["crumb", "nibble", "byte"], title="MODE")
+    renderer.clear()
+    menu.render()
+
+    text = renderer.to_text()
+    assert "MODE" in text
+    assert "> crumb" in text          # the selection marker
+    assert "nibble" in text
+    assert "byte" in text
+
+
+def test_menu_selection_moves_and_confirms_over_a_tui_surface():
+    from texastoast.ui import Menu
+
+    renderer = TuiRenderer(40, 14)
+    chosen = []
+    menu = Menu(renderer, menu_width=30, item_height=1,
+                title_height=2, item_padding=1, border_pad=1)
+    menu.show(["a", "b", "c"], on_select=lambda i, label: chosen.append(label))
+
+    menu.move_down()
+    renderer.clear()
+    menu.render()
+    assert "> b" in renderer.to_text()
+
+    menu.confirm()
+    assert chosen == ["b"]
+    assert not menu.active
+
+
+def test_a_menu_sized_in_pixels_would_not_fit_a_terminal():
+    # Why the metrics had to become configurable: the pixel defaults put the
+    # whole widget off-screen on any real terminal.
+    from texastoast.ui import Menu
+
+    renderer = TuiRenderer(80, 24)
+    menu = Menu(renderer)                      # 280 wide, 32-cell rows
+    menu.show(["one", "two"], title="NOPE")
+    renderer.clear()
+    menu.render()
+    assert "one" not in renderer.to_text()
+
+
+def test_the_menu_follows_a_surface_that_resizes():
+    # A canvas never changes size, so caching the surface dimensions was
+    # harmless there. A terminal resizes constantly, and a menu laid out for
+    # whatever the size happened to be at construction is off-centre forever.
+    from texastoast.ui import Menu
+
+    renderer = TuiRenderer(80, 24)
+    menu = Menu(renderer, menu_width=20, item_height=1,
+                title_height=1, item_padding=0, border_pad=0)
+    menu.show(["aaa"])
+
+    def marker_column() -> int:
+        renderer.clear()
+        menu.render()
+        line = next(ln for ln in renderer.to_text().split("\n") if ">" in ln)
+        return line.index(">")
+
+    wide = marker_column()
+    renderer.resize(40, 24)
+    narrow = marker_column()
+
+    assert narrow < wide, "the menu should re-centre on the smaller surface"
+    assert narrow == wide - 20
+
+
+def test_an_explicit_size_still_wins_over_the_surface():
+    from texastoast.ui import Menu
+
+    renderer = TuiRenderer(80, 24)
+    menu = Menu(renderer, width=40, height=24, menu_width=20, item_height=1,
+                title_height=1, item_padding=0, border_pad=0)
+    menu.show(["aaa"])
+    renderer.clear()
+    menu.render()
+    before = next(ln for ln in renderer.to_text().split("\n") if ">" in ln).index(">")
+
+    renderer.resize(60, 24)
+    renderer.clear()
+    menu.render()
+    after = next(ln for ln in renderer.to_text().split("\n") if ">" in ln).index(">")
+    assert before == after

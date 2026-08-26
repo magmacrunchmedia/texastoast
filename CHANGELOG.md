@@ -51,6 +51,32 @@ to accommodate it, and `GameLoop` is reused byte for byte.
 - `examples/tui_demo.py`, and `tests/test_no_hard_deps.py`, which asserts in a
   subprocess that importing texastoast pulls in none of textual, rich, tkinter,
   pygame, PIL or smbus2.
+- **`Menu` layout metrics are now arguments** (`menu_width`, `item_height`,
+  `title_height`, `border_pad`), defaulting to the pixel values it has always
+  used. They were hardcoded, so the widget was unusable on any surface that
+  does not measure in pixels: a 280-wide menu with 32-unit rows sits entirely
+  off-screen on a terminal. They are constructor arguments rather than theme
+  fields for the reason `ui/theme.py` already gives — a theme is a palette, and
+  how big a menu is depends on what is drawing it.
+
+### Fixed
+
+- **Text no longer punches a hole through what it is drawn on.** A filled rect
+  set a cell's background and then a text write overwrote the same cell with
+  no background, so on the terminal backend every glyph sat in a black box the
+  width of the string. A canvas `create_text` composites over what is beneath
+  it; a terminal cell holds one glyph and one pair of colours, so text has to
+  *read* the background it lands on to get the same result. `CellBuffer.write`
+  and `set_cell` default their `bg` to a `KEEP_BG` sentinel that does exactly
+  that — deliberately distinct from `None`, which already means "inherit the
+  terminal default". `fill()` and `outline()` still default to `None`, because
+  a fill *states* a background where a text write composites over one.
+- **`Menu` follows a surface that resizes.** It resolved the surface's
+  dimensions once, at construction, and laid out against those forever. A
+  tkinter canvas never changes size so this was invisible; a terminal is
+  resized constantly, and the menu stayed centred on whatever the window
+  happened to be when it was built. An explicitly passed `width`/`height`
+  still wins and stays fixed.
 
 ### Changed
 
