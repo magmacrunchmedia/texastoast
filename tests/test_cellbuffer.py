@@ -195,3 +195,50 @@ def test_zero_sized_buffer_absorbs_writes():
     buf.write(0, 0, "anything")
     buf.fill(0, 0, 5, 5, bg="#fff")
     assert buf.to_text() == ""
+
+
+# ── Text composites, fills stamp ────────────────────────────────────
+#
+# A terminal cell holds one glyph and one pair of colors, so a text write has
+# to read the background it lands on. Getting this wrong is visible instantly:
+# every glyph punches a hole through the tile it is drawn on.
+
+
+def test_text_keeps_the_background_it_is_drawn_over():
+    buf = CellBuffer(6, 1)
+    buf.fill(0, 0, 6, 1, bg="#123456")
+    buf.write(1, 0, "hi", fg="#ffffff")
+    assert buf.get(1, 0) == Cell("h", "#ffffff", "#123456")
+    assert buf.get(2, 0) == Cell("i", "#ffffff", "#123456")
+    # and the cells around it are untouched
+    assert buf.get(0, 0) == Cell(" ", None, "#123456")
+
+
+def test_text_can_still_paint_its_own_background():
+    buf = CellBuffer(4, 1)
+    buf.fill(0, 0, 4, 1, bg="#123456")
+    buf.write(0, 0, "x", fg="#fff", bg="#abcdef")
+    assert buf.get(0, 0).bg == "#abcdef"
+
+
+def test_text_can_clear_the_background_explicitly():
+    # None is distinct from KEEP_BG: one clears to the terminal default, the
+    # other composites.
+    buf = CellBuffer(4, 1)
+    buf.fill(0, 0, 4, 1, bg="#123456")
+    buf.write(0, 0, "x", fg="#fff", bg=None)
+    assert buf.get(0, 0).bg is None
+
+
+def test_set_cell_composites_too():
+    buf = CellBuffer(3, 1)
+    buf.fill(0, 0, 3, 1, bg="#222222")
+    buf.set_cell(1, 0, "@", fg="#ff0000")
+    assert buf.get(1, 0) == Cell("@", "#ff0000", "#222222")
+
+
+def test_a_fill_states_its_background_rather_than_inheriting():
+    buf = CellBuffer(3, 1)
+    buf.fill(0, 0, 3, 1, bg="#111111")
+    buf.fill(0, 0, 3, 1, bg=None)
+    assert buf.get(0, 0).bg is None

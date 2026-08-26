@@ -30,7 +30,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from texastoast.render.camera import Camera
-from texastoast.render.cellbuffer import EMPTY_CHAR, CellBuffer
+from texastoast.render.cellbuffer import EMPTY_CHAR, KEEP_BG, CellBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,10 @@ class TuiRenderer:
         at each call site, so they are dropped instead.
         """
         fill = kwargs.get("fill") or DEFAULT_FG
-        bg = kwargs.get("bg")
+        # Absent means "composite over whatever is underneath", which is what a
+        # canvas create_text does. Passing None here instead would clear the
+        # background and cut a hole through the tile the text sits on.
+        bg = kwargs["bg"] if "bg" in kwargs else KEEP_BG
         anchor = kwargs.get("anchor", "nw")
         text = str(text)
         ax, ay = self._anchor_offset(anchor, text)

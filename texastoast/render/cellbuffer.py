@@ -24,6 +24,28 @@ from dataclasses import dataclass, field, replace
 EMPTY_CHAR = " "
 
 
+class _KeepBg:
+    """Sentinel: leave whatever background the cell already has.
+
+    Text is composited, not stamped. On a canvas ``create_text`` draws glyphs
+    over whatever is beneath them; a terminal cell holds exactly one glyph and
+    one pair of colors, so writing text has to *read* the background it is
+    landing on or it punches a hole through the thing it is drawn on top of.
+
+    Distinct from ``None``, which means "no background — inherit the
+    terminal's default". Both are needed: one composites, one clears.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "KEEP_BG"
+
+
+#: Default background for text writes — see :class:`_KeepBg`.
+KEEP_BG = _KeepBg()
+
+
 @dataclass(frozen=True, slots=True)
 class Cell:
     """One character cell: a glyph plus its colors.
@@ -152,12 +174,18 @@ class CellBuffer:
     # ── Drawing ─────────────────────────────────────────────────────
 
     def set_cell(self, x: int, y: int, char: str, fg: str | None = None,
-                 bg: str | None = None) -> None:
-        """Write a single cell. Silently ignored when out of bounds."""
+                 bg: str | None | _KeepBg = KEEP_BG) -> None:
+        """Write a single cell. Silently ignored when out of bounds.
+
+        ``bg`` defaults to :data:`KEEP_BG`, compositing over whatever is
+        already there. Pass ``None`` to clear it to the terminal default.
+        """
         x = int(x)
         y = int(y)
         if not (0 <= x < self.width and 0 <= y < self.height):
             return
+        if bg is KEEP_BG:
+            bg = self._cells[y][x].bg
         self._cells[y][x] = Cell(char, fg, bg)
         self._claim(x, y)
 
@@ -170,11 +198,15 @@ class CellBuffer:
         return self._cells[y][x]
 
     def write(self, x: int, y: int, text: str, fg: str | None = None,
-              bg: str | None = None) -> None:
+              bg: str | None | _KeepBg = KEEP_BG) -> None:
         """Write ``text`` rightwards from ``(x, y)``, clipping at the edges.
 
         Newlines start a fresh line back at the original ``x``, so a multi-line
         string keeps its left margin. Rows past the bottom are dropped.
+
+        ``bg`` defaults to :data:`KEEP_BG`, so text drawn over a filled rect
+        keeps that rect's color instead of cutting a hole in it. Pass an
+        explicit color to paint behind the glyphs, or ``None`` to clear.
         """
         if not text:
             return
@@ -188,13 +220,17 @@ class CellBuffer:
                     if col >= self.width:
                         break
                     if col >= 0:
-                        self._cells[row][col] = Cell(ch, fg, bg)
+                        cell_bg = (self._cells[row][col].bg
+                                   if bg is KEEP_BG else bg)
+                        self._cells[row][col] = Cell(ch, fg, cell_bg)
                         self._claim(col, row)
                     col += 1
             row += 1
 
     def fill(self, x: int, y: int, w: int, h: int, bg: str | None = None,
              char: str = EMPTY_CHAR, fg: str | None = None) -> None:
+        # Note bg defaults to None, not KEEP_BG: a fill states a background,
+        # where a text write composites over one.
         """Fill a rectangle, clipped to the buffer.
 
         Defaults to painting background only — a filled ``draw_rect`` in a
