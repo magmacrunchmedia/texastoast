@@ -5,6 +5,24 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-08-27
+
+### Changed
+
+- **`TuiHost.pop_scene()` on the last scene now ends the session** instead of
+  being ignored. 0.8.0 refused to empty the stack, which broke the case the
+  method exists for.
+
+  It is the call a game makes to say "I am done, take me back to wherever I
+  came from" — and only the host knows where that is. Run on its own, a game is
+  the bottom of the stack and there is nowhere to go but out; seated by a
+  launcher, the menu is underneath and the same call returns to it. Refusing
+  left a standalone game's own menu with no way to exit, and would have forced
+  every game to carry a flag saying whether it had been launched or seated.
+
+  Quitting also handles the empty-stack problem the refusal was there to
+  prevent: there is never an empty stack, because the session ends first.
+
 ## [0.8.0] — 2026-08-27
 
 ### Added
