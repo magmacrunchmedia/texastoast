@@ -1,6 +1,6 @@
 """texastoast — Python RPG engine with I2C hardware abstraction."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 
 def __getattr__(name):
@@ -13,7 +13,7 @@ def __getattr__(name):
         return arcade.discover if name == "discover_games" else getattr(arcade, name)
 
     if name in ("Scheduler", "ManualScheduler", "TuiGame", "GameSurface",
-                "TuiInput", "TextualScheduler"):
+                "TuiInput", "TextualScheduler", "TuiHost"):
         # getattr, not a from-import: the terminal names live behind core's own
         # lazy hook so that asking for ManualScheduler does not import Textual.
         from texastoast import core
@@ -68,6 +68,7 @@ __all__ = [
     "GameSurface",
     "TuiInput",
     "TextualScheduler",
+    "TuiHost",
     "ArcadeGame",
     "GameInfo",
     "Host",

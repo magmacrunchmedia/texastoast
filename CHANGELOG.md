@@ -5,6 +5,33 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-08-27
+
+### Added
+
+- **`TuiHost`** — the concrete counterpart to the `arcade.Host` protocol added
+  in 0.7.0. Owns the terminal, the renderer and the scene stack; drains keys
+  into the top scene; pushes, pops and quits.
+
+  None of that is any particular game's business, and all of it is identical
+  whether a game runs on its own or is seated by a launcher — so writing it
+  once is the difference between a launcher being a menu and a launcher being a
+  second copy of every game's wiring.
+
+  `TuiHost.for_game(GAME)` builds a terminal sized to one game's own
+  declaration, which is what a game's `__main__` wants. `host.seat(game)`
+  starts a game on an existing terminal and **applies that game's declared
+  `fps` and `hold_ms`**, which is what a launcher wants: a menu can idle at
+  20 fps with edge input and hand over to something real-time wanting 30 and
+  held keys, without the game knowing it was seated rather than launched.
+
+  `pop_scene()` refuses to empty the stack. A host with no scenes renders
+  nothing and accepts no keys, which is indistinguishable from a hang; a game
+  run on its own is the bottom of the stack, and popping it should do nothing.
+
+  Behind the same lazy `__getattr__` as the rest of the terminal backend, so
+  the engine keeps its zero required runtime dependencies.
+
 ## [0.7.0] — 2026-08-27
 
 ### Added
