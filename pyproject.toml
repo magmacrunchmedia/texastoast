@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [
     { name = "magmacrunch media" },
 ]
-keywords = ["game", "rpg", "tkinter", "i2c", "raspberry-pi"]
+keywords = ["game", "rpg", "tkinter", "tui", "terminal", "i2c", "raspberry-pi"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -49,6 +49,7 @@ Changelog = "https://github.com/magmacrunchmedia/texastoast/blob/main/CHANGELOG.
 hardware = ["smbus2>=0.6"]
 sprites = ["Pillow>=9.0"]
 audio = ["pygame-ce>=2.4"]
+tui = ["textual>=0.40"]
 dev = ["pytest>=7.0", "ruff>=0.6"]
 
 # Version is read from the package so it is defined in exactly one place.

@@ -148,7 +148,7 @@ def test_frame_interval_accounts_for_work_time(tk_root):
     loop._running = True
     loop._last_time = time.monotonic()
     loop._fps_timer = loop._last_time
-    loop._root = type("R", (), {"after": staticmethod(recording_after)})()
+    loop._scheduler = type("R", (), {"after": staticmethod(recording_after)})()
     loop._tick()
 
     assert delays, "tick should schedule the next frame"
@@ -165,7 +165,7 @@ def test_frame_delay_never_drops_below_one_ms(tk_root):
     loop._running = True
     loop._last_time = time.monotonic()
     loop._fps_timer = loop._last_time
-    loop._root = type("R", (), {"after": staticmethod(lambda ms, f=None: delays.append(ms))})()
+    loop._scheduler = type("R", (), {"after": staticmethod(lambda ms, f=None: delays.append(ms))})()
     loop._tick()
     assert delays == [1]
 

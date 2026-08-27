@@ -18,6 +18,15 @@ class Menu:
     (or any :class:`~texastoast.render.abstract.UISurface`) — in which case
     ``width``/``height`` default from it — or a bare ``tk.Canvas`` for
     backward compatibility.
+
+    **Layout metrics are in the surface's own units, not pixels.** They default
+    to pixel-sized values because the canvas backend came first, but a terminal
+    surface measures in character cells, where a 280-unit-wide menu with
+    32-unit rows is comically off-screen. Pass ``menu_width=34,
+    item_height=1, title_height=2, item_padding=1`` for a TUI. They are
+    constructor arguments rather than theme fields for the reason
+    :mod:`texastoast.ui.theme` gives: a theme is a palette, and how big a menu
+    is depends on what is drawing it.
     """
 
     def __init__(
@@ -31,10 +40,20 @@ class Menu:
         disabled_color: str | None = None,
         item_padding: int = 8,
         theme: Theme | None = None,
+        menu_width: int = 280,
+        item_height: int = 32,
+        title_height: int = 28,
+        border_pad: int = 4,
     ):
         self._surface = as_ui_surface(surface, width, height)
-        self._width = width if width is not None else self._surface.width
-        self._height = height if height is not None else self._surface.height
+        # Kept as given, not resolved now: an explicit size is fixed, but an
+        # implicit one must be re-read from the surface at render time. A
+        # tkinter canvas never changes size, so caching it was harmless there —
+        # a terminal is resized constantly, and a menu laid out for the size
+        # the window happened to be at construction is off-centre for the rest
+        # of the session.
+        self._explicit_width = width
+        self._explicit_height = height
         self._theme = theme or DEFAULT_THEME
         # Explicit style kwargs still win; the theme supplies the defaults.
         self._font = font or self._theme.font(14)
@@ -42,6 +61,10 @@ class Menu:
         self._normal_color = normal_color or self._theme.text
         self._disabled_color = disabled_color or self._theme.disabled
         self._item_padding = item_padding
+        self._menu_width = menu_width
+        self._item_height = item_height
+        self._title_height = title_height
+        self._border_pad = border_pad
 
         self._active = False
         self._items: list[dict] = []
@@ -50,6 +73,17 @@ class Menu:
         self._on_cancel: Callable | None = None
         self._tag = "menu"
         self._title = ""
+
+    @property
+    def _width(self) -> int:
+        """The surface width to lay out against, followed live."""
+        return (self._explicit_width if self._explicit_width is not None
+                else self._surface.width)
+
+    @property
+    def _height(self) -> int:
+        return (self._explicit_height if self._explicit_height is not None
+                else self._surface.height)
 
     @property
     def active(self) -> bool:
@@ -140,11 +174,12 @@ class Menu:
         if not self._active:
             return
 
-        menu_width = 280
-        item_height = 32
+        menu_width = self._menu_width
+        item_height = self._item_height
+        pad = self._border_pad
         total_h = len(self._items) * item_height + self._item_padding * 2
         if self._title:
-            total_h += 28
+            total_h += self._title_height
 
         cx = self._width / 2
         cy = self._height / 2
@@ -155,7 +190,7 @@ class Menu:
 
         theme = self._theme
         self._surface.ui_rect(
-            x1 - 4, y1 - 4, (x2 + 4) - (x1 - 4), (y2 + 4) - (y1 - 4),
+            x1 - pad, y1 - pad, (x2 + pad) - (x1 - pad), (y2 + pad) - (y1 - pad),
             fill=theme.box_fill, outline=theme.box_outline,
             outline_width=theme.outline_width,
             group=self._tag,
@@ -165,12 +200,12 @@ class Menu:
 
         if self._title:
             self._surface.ui_text(
-                cx, y + 10, self._title,
+                cx, y + self._title_height // 3, self._title,
                 fill=self._normal_color, font=theme.font(11, "bold"),
                 anchor="center",
                 group=self._tag,
             )
-            y += 28
+            y += self._title_height
 
         for i, item in enumerate(self._items):
             is_selected = (i == self._selected)
@@ -178,7 +213,7 @@ class Menu:
 
             if is_selected and is_enabled:
                 self._surface.ui_rect(
-                    x1 + 4, y, (x2 - 4) - (x1 + 4), item_height,
+                    x1 + pad, y, (x2 - pad) - (x1 + pad), item_height,
                     fill=theme.selection_fill,
                     group=self._tag,
                 )
@@ -189,7 +224,7 @@ class Menu:
                 prefix = "  "
 
             self._surface.ui_text(
-                x1 + self._item_padding + 8, y + item_height / 2,
+                x1 + self._item_padding + pad, y + item_height // 2,
                 prefix + item["label"], fill=color,
                 font=self._font, anchor="w",
                 group=self._tag,

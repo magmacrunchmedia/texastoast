@@ -41,7 +41,12 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y xvfb python3-tk
 
-      - run: pip install -e ".[dev,sprites]"
+      # `tui` matters as much as the display does below: without it the whole
+      # terminal backend suite skips and CI reports green having never
+      # constructed a TuiGame. The no-hard-deps tests still pass with Textual
+      # installed — they check what `import texastoast` pulls in, in a
+      # subprocess, not what happens to be on the machine.
+      - run: pip install -e ".[dev,sprites,tui]"
 
       # TEXASTOAST_REQUIRE_TK turns a missing display into a failure instead of
       # letting the UI tests skip and report green.

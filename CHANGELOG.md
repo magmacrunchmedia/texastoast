@@ -5,6 +5,101 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-08-26
+
+The terminal release. The engine could already describe a frame without
+knowing what drew it — `render/abstract.py` refuses to import tkinter and
+documents `present()` as existing for a future buffered backend — but nothing
+had ever taken it up on that, so the claim was untested. This release adds a
+second backend and finds out.
+
+**The terminal is not a new engine.** adenosine is the web engine, magnolia the
+Wii engine, texastoast the Python engine; a TUI is a *backend* under this one.
+Nothing in `render/`, `ui/`, `world/`, `scene.py` or `input/players.py` changed
+to accommodate it, and `GameLoop` is reused byte for byte.
+
+### Added
+
+- **Terminal backend** (`render/tui.py`, `core/tui_game.py`), behind the new
+  `[tui]` extra. `TuiRenderer` satisfies `Renderer` *and* `UISurface`
+  structurally, exactly as `CanvasRenderer` does, so a render function written
+  against the protocols runs on either with no changes. `TuiGame` mirrors
+  `Game`'s public surface (`set_update`/`set_render`/`start`/`quit`/`bind_key`)
+  and takes its surface and scheduler **by injection**, so a further backend is
+  a constructor argument rather than a second host class. `GameSurface` is a
+  single Textual widget, not a tree: a game repaints everything every frame, so
+  per-widget reactive diffing has nothing to offer it.
+- **`CellBuffer`** (`render/cellbuffer.py`), a character-cell framebuffer with
+  group-scoped erasure. Framework-free on purpose — no Textual, no Rich, no
+  curses, no tkinter — because it is the half of a terminal backend that has
+  nothing to do with which library drives it. A hand-written ANSI backend
+  consumes it verbatim and adds only raw mode, an SGR-tracking diff emitter and
+  escape-sequence input decoding.
+- **`Scheduler` protocol** (`core/scheduler.py`). `GameLoop` only ever needed
+  two methods from its host, `after` and `after_cancel`, but the parameter was
+  named `root` and typed as a tkinter widget, so the seam was an accident of
+  duck-typing rather than something a second backend could be written against.
+  Naming it changes nothing at runtime — a `tk.Misc` satisfies it structurally,
+  which is why the loop worked in the first place. Ships `ManualScheduler`,
+  which drives the whole loop deterministically with no display and no sleeping.
+- **`TuiInput`**, an `InputSource` for terminals. Terminals report key presses
+  and **never releases**, so held state cannot be observed the way
+  `input/keyboard.py` observes it under tkinter. Two honest modes instead of one
+  dishonest one: `hold_ms=0` (default) gives edge semantics — one keystroke, one
+  action, which is what a turn-based game wants — and `hold_ms>0` infers a held
+  key from the terminal's auto-repeat, for real-time games.
+- `examples/tui_demo.py`, and `tests/test_no_hard_deps.py`, which asserts in a
+  subprocess that importing texastoast pulls in none of textual, rich, tkinter,
+  pygame, PIL or smbus2.
+- **`Menu` layout metrics are now arguments** (`menu_width`, `item_height`,
+  `title_height`, `border_pad`), defaulting to the pixel values it has always
+  used. They were hardcoded, so the widget was unusable on any surface that
+  does not measure in pixels: a 280-wide menu with 32-unit rows sits entirely
+  off-screen on a terminal. They are constructor arguments rather than theme
+  fields for the reason `ui/theme.py` already gives — a theme is a palette, and
+  how big a menu is depends on what is drawing it.
+
+### Fixed
+
+- **Text no longer punches a hole through what it is drawn on.** A filled rect
+  set a cell's background and then a text write overwrote the same cell with
+  no background, so on the terminal backend every glyph sat in a black box the
+  width of the string. A canvas `create_text` composites over what is beneath
+  it; a terminal cell holds one glyph and one pair of colours, so text has to
+  *read* the background it lands on to get the same result. `CellBuffer.write`
+  and `set_cell` default their `bg` to a `KEEP_BG` sentinel that does exactly
+  that — deliberately distinct from `None`, which already means "inherit the
+  terminal default". `fill()` and `outline()` still default to `None`, because
+  a fill *states* a background where a text write composites over one.
+- **`Menu` follows a surface that resizes.** It resolved the surface's
+  dimensions once, at construction, and laid out against those forever. A
+  tkinter canvas never changes size so this was invisible; a terminal is
+  resized constantly, and the menu stayed centred on whatever the window
+  happened to be when it was built. An explicitly passed `width`/`height`
+  still wins and stays fixed.
+
+### Changed
+
+- `GameLoop`'s first parameter is now `scheduler`, not `root`. Every call site
+  passes it positionally and a tkinter root still satisfies it, so this is a
+  rename, not a break. Code reaching for the private `loop._root` must now use
+  `loop._scheduler` (or the new public `loop.scheduler`).
+
+### Notes
+
+- **Zero required dependencies is unchanged.** Textual is behind `[tui]`, and
+  the terminal host is behind a lazy `__getattr__` in `core/__init__.py`, so
+  `import texastoast` costs nothing extra and a Pi install does not pay for a
+  backend it will not use. Asking for `TuiGame` without the extra raises an
+  ImportError naming the fix rather than a bare ModuleNotFoundError.
+- **`TuiRenderer.draw_image` is a documented no-op.** A character grid cannot
+  honor the shared sprite-sheet contract. That is a limit of terminals, not a
+  change to the format — nothing in `render/tui.py` reads or writes a sheet.
+- **Coordinates are character cells, not pixels.** Cells are roughly twice as
+  tall as wide and there is no universal ratio, so the backend does not guess;
+  a game ported from a pixel canvas scales its own x. Baking one game's aspect
+  choice into the renderer would be wrong for the next one.
+
 ## [0.5.0] — 2026-08-24
 
 The game structure release. 0.4.0 made the *hardware* buildable without
