@@ -84,16 +84,43 @@ def test_pushing_and_popping_moves_the_top_scene(host):
     assert host.scene is a
 
 
-def test_the_last_scene_cannot_be_popped(host):
-    # An empty stack renders nothing and takes no keys, which looks exactly
-    # like a hang. A game run on its own is the bottom of the stack.
-    only = Scene()
-    host.push_scene(only)
+def test_popping_the_last_scene_ends_the_session(host):
+    # The call a game makes to say "take me back to wherever I came from".
+    # Standalone there is nowhere to go but out; the alternative — refusing —
+    # leaves a game's own menu with no way to exit.
+    quit_calls = []
+    host.quit = lambda: quit_calls.append(1)
+
+    host.push_scene(Scene())
+    host.stack.update(0)
+    host.pop_scene()
+
+    assert quit_calls == [1]
+
+
+def test_popping_with_something_underneath_goes_back_instead_of_quitting(host):
+    quit_calls = []
+    host.quit = lambda: quit_calls.append(1)
+    under, over = Scene("under"), Scene("over")
+    host.push_scene(under)
+    host.push_scene(over)
     host.stack.update(0)
 
     host.pop_scene()
     host.stack.update(0)
-    assert host.scene is only
+
+    assert host.scene is under
+    assert quit_calls == []
+
+
+def test_the_stack_is_never_left_empty(host):
+    # Whatever happens, there is always either a scene or no session — never a
+    # host rendering nothing and accepting no keys, which looks like a hang.
+    host.push_scene(Scene())
+    host.stack.update(0)
+    host.pop_scene()
+    host.stack.update(0)
+    assert len(host.stack) >= 1
 
 
 def test_keys_reach_the_top_scene_only(host):

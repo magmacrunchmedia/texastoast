@@ -76,15 +76,24 @@ class TuiHost:
         self._stack.push(scene)
 
     def pop_scene(self) -> None:
-        """Remove the top scene, unless it is the last one.
+        """Remove the top scene. Popping the last one ends the session.
 
-        A host with an empty stack renders nothing and accepts no keys, which
-        looks exactly like a hang. A game run on its own is the bottom of the
-        stack and popping it should do nothing; under a launcher the menu is
-        underneath, so the same call returns to it.
+        This is the call a game makes to say "I am done, take me back to
+        wherever I came from", and only the host knows where that is. Run on
+        its own, a game is the bottom of the stack and there is nowhere to go
+        but out; seated by a launcher, the menu is underneath and the same call
+        returns to it. One behaviour, both outcomes right, and the game needs
+        no flag telling it which situation it is in.
+
+        Quitting rather than refusing also handles the empty-stack problem it
+        would otherwise create: a host with no scenes renders nothing and
+        accepts no keys, which is indistinguishable from a hang. There is never
+        an empty stack because the session ends first.
         """
         if len(self._stack) > 1:
             self._stack.pop()
+        else:
+            self.quit()
 
     def quit(self) -> None:
         self._game.quit()
