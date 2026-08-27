@@ -33,6 +33,7 @@ class GameLoop:
         self._scheduler = scheduler
         self._update_fn = update_fn
         self._render_fn = render_fn
+        self._target_fps = float(fps)
         self._interval_ms = max(1, int(1000 / fps))
         self._max_consecutive_errors = max_consecutive_errors
         self._on_error = on_error
@@ -48,6 +49,34 @@ class GameLoop:
     @property
     def scheduler(self) -> Scheduler:
         return self._scheduler
+
+    @property
+    def target_fps(self) -> float:
+        """The rate being aimed for, as opposed to :attr:`fps` measured.
+
+        Settable, for a host that seats games wanting different rates: a menu
+        can idle slowly and hand over to something real-time without tearing
+        down the loop. Takes effect on the next tick — the one already
+        scheduled keeps its delay, which is at most one frame of the old rate.
+
+        Reports the rate that was *requested*. Delays are whole milliseconds,
+        so the interval quantizes — 60 fps schedules at 16 ms, which is really
+        62.5 — and reading back a number nobody asked for would be worse than
+        reporting the intent. :attr:`interval_ms` is the honest scheduling
+        figure.
+        """
+        return self._target_fps
+
+    @target_fps.setter
+    def target_fps(self, fps: float) -> None:
+        fps = max(1e-6, float(fps))
+        self._target_fps = fps
+        self._interval_ms = max(1, int(1000 / fps))
+
+    @property
+    def interval_ms(self) -> int:
+        """Milliseconds between ticks — the quantized form of :attr:`target_fps`."""
+        return self._interval_ms
 
     @property
     def fps(self) -> float:

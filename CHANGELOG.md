@@ -5,6 +5,37 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-08-27
+
+### Added
+
+- **`texastoast.arcade`** — the seam a launcher and a game agree on without
+  either importing the other. A game normally owns its terminal, which is right
+  for one game shipped as one command and wrong for a menu that seats several:
+  there is one terminal, and whoever started it owns it. So the module names
+  the two halves — a `Host` owns the terminal, renderer and scene stack, and an
+  `ArcadeGame` owns its rules and screens and is handed a host.
+
+  `GameInfo` carries what a launcher must know *before* seating a game: title
+  and blurb for the menu, but also `fps` and `hold_ms`, because a turn-based
+  game wants edge input at 20 fps and a real-time one wants decay input at 30,
+  and the host owns both of those.
+
+  Discovery is by entry point (`magmacrunch.games`), matching how `mgs.py` is
+  found by magmascript. Installing a game makes it appear in a launcher;
+  uninstalling makes it vanish; the launcher never needs releasing to add a
+  title. One game failing to load costs you that game, with a warning, not the
+  whole menu.
+
+  **This module depends on no game and nothing in it reaches downward** — the
+  same relationship `render/abstract.py` has with its backends. That is what
+  lets the engine stay Apache while the games it describes are not.
+
+- `GameLoop.target_fps` is now readable and settable, with `interval_ms`
+  alongside it for the quantized scheduling figure. A host that seats games
+  wanting different rates can retune without tearing the loop down. The
+  existing `fps` property still reports the *measured* rate.
+
 ## [0.6.0] — 2026-08-26
 
 The terminal release. The engine could already describe a frame without

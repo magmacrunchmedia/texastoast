@@ -1,12 +1,16 @@
 """texastoast — Python RPG engine with I2C hardware abstraction."""
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 
 def __getattr__(name):
     if name in ("Config", "GameLoop", "Game"):
         from texastoast.core import Config, Game, GameLoop
         return {"Config": Config, "GameLoop": GameLoop, "Game": Game}[name]
+
+    if name in ("ArcadeGame", "GameInfo", "Host", "discover_games"):
+        from texastoast import arcade
+        return arcade.discover if name == "discover_games" else getattr(arcade, name)
 
     if name in ("Scheduler", "ManualScheduler", "TuiGame", "GameSurface",
                 "TuiInput", "TextualScheduler"):
@@ -64,6 +68,10 @@ __all__ = [
     "GameSurface",
     "TuiInput",
     "TextualScheduler",
+    "ArcadeGame",
+    "GameInfo",
+    "Host",
+    "discover_games",
     "Scene",
     "SceneStack",
     "Mixer",
