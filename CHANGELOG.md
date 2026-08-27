@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same face, and three hand-placed copies of an alphabet is three places
   for an `S` to drift.
 
+  A newline breaks the title, the way `<br>` does in a card title on the web.
+  The long names in this family are written that way there —
+  `TEXAS HOLD'EM<br>LAVA DOME`, `GEORGE BOOLE<br>HAS ENTERED<br>THE CHAT` — and
+  a name that only fits by being cut short is not the name. Each row is centred
+  inside a padded rectangle, so a broken title is still centred as one block.
+  `height()` reports the rows a title takes and `fits()` checks both axes.
+
 ## [0.9.0] — 2026-08-27
 
 ### Changed

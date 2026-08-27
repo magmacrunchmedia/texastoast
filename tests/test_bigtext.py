@@ -122,3 +122,49 @@ def test_render_the_whole_face(capsys):
             for line in bigtext.lines(chunk):
                 print(line)
             print()
+
+# ── Line breaks ─────────────────────────────────────────────────────
+
+
+def test_a_newline_breaks_the_title_the_way_br_does():
+    """The long names in this family are written that way on the web -
+    TEXAS HOLD'EM<br>LAVA DOME - and a name that only fits by being cut short
+    is not the name."""
+    two = bigtext.lines("AB\nCD")
+    assert len(two) == 2 * bigtext.GLYPH_H
+    assert two[:bigtext.GLYPH_H] == [r.ljust(len(two[0]))
+                                     for r in bigtext.lines("AB")]
+
+
+def test_height_counts_the_broken_lines():
+    assert bigtext.height("AB") == bigtext.GLYPH_H
+    assert bigtext.height("AB\nCD") == 2 * bigtext.GLYPH_H
+
+
+def test_width_is_the_widest_row():
+    assert bigtext.width("A\nABCD") == bigtext.width("ABCD")
+
+
+def test_a_broken_title_comes_back_as_a_rectangle():
+    """Padded and each row centred, so the caller centres one block rather
+    than several lines that would drift apart."""
+    got = bigtext.lines("A\nABCD")
+    assert len({len(line) for line in got}) == 1
+
+
+def test_the_short_row_is_centred_not_flush_left():
+    got = bigtext.lines("A\nABCD")
+    assert got[0].startswith(" "), "the narrow row should be indented"
+    assert got[0].strip() == bigtext.lines("A")[0].strip()
+
+
+def test_fits_accounts_for_the_extra_rows():
+    tall = "TEXAS HOLD'EM\nLAVA DOME"
+    assert bigtext.fits(tall, 78, rows=6)
+    assert not bigtext.fits(tall, 78, rows=5)
+
+
+def test_the_two_line_name_fits_a_terminal_where_one_line_would_not():
+    """This is the whole reason line breaks exist here."""
+    assert bigtext.width("TEXAS HOLD'EM LAVA DOME") > 100
+    assert bigtext.width("TEXAS HOLD'EM\nLAVA DOME") <= 78

@@ -99,27 +99,51 @@ def supports(char: str) -> bool:
     return char.upper() in _FONT
 
 
-def width(text: str) -> int:
-    """Columns :func:`lines` will produce for ``text``, gutter excluded."""
+def _row_width(text: str) -> int:
     if not text:
         return 0
     return len(text) * ADVANCE - (ADVANCE - GLYPH_W)
 
 
-def lines(text: str) -> list[str]:
-    """``text`` as :data:`GLYPH_H` lines of block lettering.
+def width(text: str) -> int:
+    """Columns :func:`lines` will produce for ``text``, gutter excluded.
 
-    Every line comes back the same length, so the block can be centred as a
-    block. Centring the lines individually would ragged it apart - the top row
-    of a word beginning in ``L`` is mostly empty.
+    For multi-line text this is the widest row, since the block comes back
+    padded to a rectangle.
+    """
+    return max((_row_width(row) for row in text.split("\n")), default=0)
+
+
+def height(text: str) -> int:
+    """Rows :func:`lines` will produce for ``text``."""
+    return len(text.split("\n")) * GLYPH_H
+
+
+def lines(text: str) -> list[str]:
+    """``text`` as block lettering, :data:`GLYPH_H` rows per line of input.
+
+    A newline breaks the title, the way ``<br>`` does in a card title on the
+    web — the long names in this family are written that way there
+    (``TEXAS HOLD'EM<br>LAVA DOME``), and a name that only fits by being cut
+    short is not the name.
+
+    Every line comes back the same length and each row of input is centred
+    within that, so the whole thing can be centred as one block. Centring the
+    lines individually would ragged it apart: the top row of a word beginning
+    in ``L`` is mostly empty.
     """
     if not text:
         return [""] * GLYPH_H
-    glyphs = [_FONT.get(char.upper(), _MISSING) for char in text]
-    return [
-        " ".join(glyph[row] for glyph in glyphs)
-        for row in range(GLYPH_H)
-    ]
+
+    total = width(text)
+    out: list[str] = []
+    for row_text in text.split("\n"):
+        glyphs = [_FONT.get(char.upper(), _MISSING) for char in row_text]
+        pad = (total - _row_width(row_text)) // 2
+        for row in range(GLYPH_H):
+            drawn = " ".join(glyph[row] for glyph in glyphs)
+            out.append((" " * pad + drawn).ljust(total))
+    return out
 
 
 def block(text: str) -> str:
@@ -130,12 +154,12 @@ def block(text: str) -> str:
 def fits(text: str, cols: int, rows: int = GLYPH_H) -> bool:
     """Whether ``text`` renders inside ``cols`` x ``rows``.
 
-    A caller with several candidate titles - a full name, an abbreviation,
-    plain capitals - can walk them and take the first that fits, which is what
-    a resizable window needs.
+    A caller with several candidate titles - the name broken over two lines,
+    the name on one, plain capitals - can walk them and take the first that
+    fits, which is what a resizable window needs.
     """
-    return width(text) <= cols and GLYPH_H <= rows
+    return width(text) <= cols and height(text) <= rows
 
 
-__all__ = ["ADVANCE", "GLYPH_H", "GLYPH_W", "block", "fits", "lines",
+__all__ = ["ADVANCE", "GLYPH_H", "GLYPH_W", "block", "fits", "height", "lines",
            "supports", "width"]
