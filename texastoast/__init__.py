@@ -1,6 +1,6 @@
 """texastoast — Python RPG engine with I2C hardware abstraction."""
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 
 def __getattr__(name):

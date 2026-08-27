@@ -5,6 +5,36 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-08-27
+
+### Added
+
+- **`texastoast.ui.bigtext`** — block lettering, for a title that has to look
+  like a title in a terminal.
+
+  A terminal program does not choose its font: whatever the person running it
+  has their emulator set to is what every string renders in, and there is no
+  `font-family` to reach for. So a title has to be *drawn*, out of characters
+  that are geometry rather than type — block elements fill their cell and
+  therefore look the same in every monospace font.
+
+  Fixed-width, four columns of ink and a fifth of gutter, three rows tall.
+  Fixed because that is what the arcade lettering it imitates does, and
+  because a caller can then ask `width()` where a title lands instead of
+  rendering it to find out. Three rows rather than two because a two-row block
+  face cannot tell `B` from `D` or `O` from `Q` without quadrant glyphs, and a
+  title screen that renders BOOLE as DOOLE is worse than one in plain capitals.
+
+  Not a widget and not a renderer — it turns a string into lines and the caller
+  draws them however it draws anything else, so it works against any backend
+  and none of it is terminal-specific. Unsupported characters are a gap rather
+  than an exception: a title is decoration, and decoration must not be able to
+  take a game down.
+
+  It is in `ui/` rather than in a game because all three terminal games want
+  the same face, and three hand-placed copies of an alphabet is three places
+  for an `S` to drift.
+
 ## [0.9.0] — 2026-08-27
 
 ### Changed
