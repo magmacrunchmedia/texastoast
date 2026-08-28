@@ -5,6 +5,40 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-08-27
+
+### Added
+
+- **`texastoast.scores`** — high scores that survive the process.
+
+  A score you lose when you close the terminal is not a high score, it is a
+  number on a screen. `ScoreBook` is a JSON file per game in a per-user data
+  directory, written atomically and read back on the next run.
+
+  **Deliberately shaped like the web arcade's scoreboard.** The browser games
+  post to a WebSocket backend through `@magmacrunch/adenosine-score-client`,
+  and that client keeps this exact structure in `localStorage` as its offline
+  fallback: `{initials, score, ...extra}` records, sorted descending, the top
+  hundred kept, and a rank counted against the *whole* list rather than the
+  truncated one, so a run that misses the table still gets a truthful answer
+  instead of a zero. Matching it is what makes a future sync additive rather
+  than a translation layer.
+
+  The sync itself is deliberately absent: it needs a WebSocket client, which is
+  a dependency this engine does not have and should not acquire on behalf of
+  every game that wants to remember a number. `SaveResult.synced` is the seam —
+  always `False` today, and the answer to "did that reach the server" the day
+  something sends them.
+
+  Nothing in it imports outside the standard library, and nothing in it knows
+  what a terminal is. Locating the data directory is three platform rules
+  written out rather than a dependency, and `MAGMACRUNCH_DATA_DIR` overrides
+  them.
+
+  A corrupt or unreadable file reads as an empty board, and a directory that
+  cannot be written costs the record rather than the game. Losing a high score
+  is bad; refusing to start is worse.
+
 ## [0.10.0] — 2026-08-27
 
 ### Added
