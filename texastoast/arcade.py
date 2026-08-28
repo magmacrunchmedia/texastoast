@@ -72,8 +72,18 @@ class GameInfo:
     #: inferred from auto-repeat. ``0`` means edge semantics — one keystroke,
     #: one action — which is what a turn-based game wants and what makes a
     #: single arrow press move one square instead of sliding across the board.
-    #: A real-time game wants this comfortably above the terminal's repeat
-    #: interval, typically 100-150.
+    #:
+    #: **A real-time game does not automatically want this above zero**, and
+    #: the number to beat is the repeat *delay*, not the repeat interval. A
+    #: keyboard sends one event and then goes silent for around 500 ms before
+    #: repeating; anything tuned to the interval expires inside that silence
+    #: and reads as a control that ignores you for a third of a second and
+    #: then works. Anything tuned past the delay stays set for half a second
+    #: after a real release.
+    #:
+    #: Decay suits a held *direction*, where overshoot is survivable. For a
+    #: control whose timing is the game, leave this at 0 and drive it from
+    #: discrete presses instead — see :class:`~texastoast.core.tui_game.TuiInput`.
     hold_ms: int = 0
 
     #: Smallest terminal the game draws in. A launcher can warn before seating

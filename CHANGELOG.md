@@ -39,6 +39,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot be written costs the record rather than the game. Losing a high score
   is bad; refusing to start is worse.
 
+### Changed
+
+- **`hold_ms` guidance corrected on `TuiInput` and `GameInfo`.** Both told you
+  to tune it "above the terminal's repeat interval, typically 100-150", and
+  that advice is wrong in a way that ships.
+
+  The number to beat is the repeat *delay*, not the interval. A keyboard sends
+  one event and then goes **silent for around 500 ms** before repeating every
+  30-50 ms. A `hold_ms` of 140 therefore expires in the middle of that silence,
+  and the button reads as released for a third of a second starting the moment
+  the key went down — a control that ignores you and then works. Tuning past
+  the delay instead leaves the button set for half a second after a real
+  release, which in a game with momentum cannot be aimed.
+
+  Moonlight Drift shipped at 140 on this advice and had to be rewritten to
+  drive thrust from discrete presses. Nothing caught it, because a test loop
+  presses again on the next iteration: instant repeats, no delay, no gap.
+
+  So: decay suits a held *direction*, where overshoot is survivable. For a
+  control whose timing is the game, leave `hold_ms` at 0 and use discrete
+  presses, sized so one press outlasts the repeat delay. No behaviour changed —
+  only the advice, which was the part doing the damage.
+
 ## [0.10.0] — 2026-08-27
 
 ### Added

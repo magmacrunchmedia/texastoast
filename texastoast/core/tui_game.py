@@ -171,9 +171,28 @@ class TuiInput:
     wants, and it is honest: one keystroke, one action.
 
     ``hold_ms > 0`` — **decay** semantics. A press keeps the button set for that
-    long, refreshed by the terminal's own key-repeat. This approximates holding
-    a key for real-time games. Tune it above the terminal's repeat interval
-    (typically 30-50 ms) or the input will stutter.
+    long, refreshed by the terminal's own key-repeat.
+
+    **Decay is a worse approximation of a held key than it looks, and the trap
+    is the repeat delay rather than the repeat interval.** A keyboard sends one
+    event, then goes *silent* for its repeat delay — around 500 ms on a typical
+    machine — before repeating every 30-50 ms. A ``hold_ms`` tuned to the
+    interval therefore expires in the middle of that silence, and the button
+    reads as released for a third of a second starting the moment the key went
+    down. It looks like an input that ignores you and then works.
+
+    Tuning past the delay instead trades that for the opposite problem: the
+    button stays set for half a second after a real release, which in a game
+    with any momentum is a control you cannot aim.
+
+    So decay suits a *held direction*, where a little overshoot is survivable
+    and the stakes are which way something drifts. It does not suit a control
+    where the exact moment of pressing and releasing is the game. For that,
+    leave ``hold_ms`` at 0 and drive the action from discrete presses — one
+    press, one impulse, sized so its effect outlasts the repeat delay. That is
+    what Moonlight Drift does after shipping the other way first, and the bug
+    was invisible to tests because a test loop presses again on the next
+    iteration: instant repeats, no delay, no gap.
     """
 
     #: Terminal key names to controller buttons. WASD sits alongside the arrows;
