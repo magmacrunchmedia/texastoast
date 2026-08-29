@@ -1,5 +1,21 @@
 """The arcade seam — what a game exposes so that something else can launch it.
 
+.. note::
+
+   **This is no longer the copy the magmacrunch arcade uses.** The terminal
+   half of this engine was extracted into the ``magmacrunch`` package, and the
+   launcher and all three cabinets now import ``magmacrunch.engine.arcade``.
+   Where the two disagree, that one is authoritative and this one is a fossil.
+
+   It stays here because texastoast is published under Apache-2.0 and has its
+   own consumers — the playground, the examples — and deleting a module from a
+   released package to tidy a duplicate is not a trade worth making.
+
+   :data:`ENTRY_POINT_GROUP` is the one thing that must never diverge. Both
+   copies name the same group, and a game declares itself in it exactly once;
+   change the string in one place and installed games stop being found by the
+   launcher that reads the other.
+
 A game normally owns its terminal: it builds a :class:`~texastoast.core.tui_game.TuiGame`,
 picks a frame rate, decides how input behaves, and runs until quit. That is the
 right shape for one game shipped as one command, and both terminal games are

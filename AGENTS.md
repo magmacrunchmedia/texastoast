@@ -2,7 +2,9 @@
 
 Python (3.10+) 2D game engine on tkinter, with an I2C hardware abstraction for
 Raspberry Pi "Magma Hub" controllers. Published on PyPI as `texastoast`
-(currently 0.5.0). Everything degrades gracefully: no I2C, no display, no audio
+(the version lives in `texastoast/__init__.py`; do not restate it here, since a
+number written in prose goes stale the next time one is cut). Everything
+degrades gracefully: no I2C, no display, no audio
 backend — the engine still runs on keyboard input. Apache-2.0, hatchling build.
 
 ## AI Attribution
@@ -41,6 +43,37 @@ The terminal is **not a fourth engine** — it is a second output surface for th
 one. adenosine is the web engine, magnolia the Wii engine, texastoast the Python
 engine; a TUI is a backend under texastoast, and new games get one by targeting
 `render/abstract.py` rather than any particular backend.
+
+### The terminal half now also lives in `magmacrunch`
+
+That paragraph describes this repo, and it is still true of this repo. It is no
+longer the whole picture.
+
+The terminal backend was **extracted** — copied, not moved — into the
+`magmacrunch` package as `magmacrunch.engine`: the cell buffer, `render/tui.py`,
+`core/tui_game.py`, `core/tui_host.py`, `scene.py`, `scores.py`, `ui/` and
+`arcade.py`. The magmacrunch launcher and its three cabinets import that copy
+and no longer depend on texastoast at all.
+
+What that means when working here:
+
+- **The copy in `magmacrunch` is authoritative for the arcade.** A fix to the
+  terminal backend made here does not reach the arcade, and probably needs
+  making there instead — or in both, deliberately.
+- **`ENTRY_POINT_GROUP` in `arcade.py` must never diverge** from magmacrunch's.
+  Both name `magmacrunch.games`; a game declares itself in it once, and
+  changing the string in one repo makes installed games invisible to the
+  launcher reading the other.
+- **The tests for the extracted modules now exist in both places.** The ones
+  that stayed here — `test_ui.py`, `test_input.py`, `test_render_protocol.py`,
+  `test_loop.py`, `test_recording.py` and `conftest.py` — are the tkinter-bound
+  ones, which is why they stayed. The rest were ported to
+  `magmacrunch/tests/engine/`.
+
+Nothing here is deprecated by the extraction: the tkinter engine, the I2C stack,
+magmascript and the playground all still use these modules, and this package
+stays Apache-2.0 where magmacrunch is Noncommercial. Making texastoast depend on
+magmacrunch to deduplicate would invert that, and is not an option.
 
 | | `render/canvas.py` | `render/tui.py` |
 |---|---|---|
