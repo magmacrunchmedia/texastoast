@@ -5,6 +5,30 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] — 2026-08-29
+
+### Changed
+
+- **`texastoast.arcade` says that it is no longer the copy the arcade reads.**
+
+  The terminal backend was extracted — copied, not moved — into the
+  `magmacrunch` package as `magmacrunch.engine`. The magmacrunch launcher and
+  all three of its cabinets now import `magmacrunch.engine.arcade` and do not
+  depend on texastoast at all. Nothing here changed when that happened, which
+  is the problem: this module still described itself as the seam a launcher
+  enumerates, and nothing said the launcher had stopped enumerating it.
+
+  Documentation only. No code changed, nothing is deprecated, and the tkinter
+  engine, the I2C stack, magmascript and the playground all still use these
+  modules. `ENTRY_POINT_GROUP` is flagged as the one string that must never
+  diverge between the two copies: both declare `magmacrunch.games`, a game
+  declares itself in it once, and changing it in one repo would make installed
+  games invisible to the launcher reading the other.
+
+  See `AGENTS.md` for which copy is authoritative, and for why deduplicating
+  the other way round is not available — texastoast is Apache-2.0 and
+  magmacrunch is Noncommercial, so the dependency cannot point that way.
+
 ## [0.11.0] — 2026-08-27
 
 ### Added
