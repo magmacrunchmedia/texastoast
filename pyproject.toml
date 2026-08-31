@@ -40,10 +40,10 @@ texastoast-bench = "texastoast.devtools.bench:main"
 
 [project.urls]
 Homepage = "https://magmacrunch.com/ware/texastoast/"
-Source = "https://github.com/magmacrunchmedia/texastoast"
-Issues = "https://github.com/magmacrunchmedia/texastoast/issues"
-Documentation = "https://github.com/magmacrunchmedia/texastoast/wiki"
-Changelog = "https://github.com/magmacrunchmedia/texastoast/blob/main/CHANGELOG.md"
+Source = "https://github.com/magmacrunch-media/texastoast"
+Issues = "https://github.com/magmacrunch-media/texastoast/issues"
+Documentation = "https://github.com/magmacrunch-media/texastoast/wiki"
+Changelog = "https://github.com/magmacrunch-media/texastoast/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 hardware = ["smbus2>=0.6"]

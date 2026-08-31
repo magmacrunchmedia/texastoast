@@ -2,12 +2,12 @@
 
 [![PyPI](https://img.shields.io/pypi/v/texastoast.svg)](https://pypi.org/project/texastoast/)
 [![Python versions](https://img.shields.io/pypi/pyversions/texastoast.svg)](https://pypi.org/project/texastoast/)
-[![CI](https://github.com/magmacrunchmedia/texastoast/actions/workflows/ci.yml/badge.svg)](https://github.com/magmacrunchmedia/texastoast/actions/workflows/ci.yml)
+[![CI](https://github.com/magmacrunch-media/texastoast/actions/workflows/ci.yml/badge.svg)](https://github.com/magmacrunch-media/texastoast/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Python RPG engine with I2C hardware abstraction for magmacrunch game systems.
 
-A tkinter-based 2D game engine inspired by [adenosine](https://github.com/magmacrunchmedia/adenosine), with optional I2C support for Raspberry Pi hardware.
+A tkinter-based 2D game engine inspired by [adenosine](https://github.com/magmacrunch-media/adenosine), with optional I2C support for Raspberry Pi hardware.
 
 It ships a [hardware dev kit](#hardware-dev-kit) too: a simulator, a controller
 test bench, and session record/replay, so you can build and test against I2C
@@ -38,7 +38,7 @@ player (or to silence) rather than failing.
 ### From source
 
 ```bash
-git clone https://github.com/magmacrunchmedia/texastoast.git
+git clone https://github.com/magmacrunch-media/texastoast.git
 cd texastoast
 pip install -e ".[dev]"
 ```
@@ -135,7 +135,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the rest.
 
 `Entity.move()` gained a required `dt` argument, and a few defaults changed.
 See [CHANGELOG.md](CHANGELOG.md) or the
-[migration guide](https://github.com/magmacrunchmedia/texastoast/wiki/Migrating-to-0.2.0).
+[migration guide](https://github.com/magmacrunch-media/texastoast/wiki/Migrating-to-0.2.0).
 
 ```python
 player.move(state.dx, state.dy, tilemap)      # 0.1.x — px per frame
@@ -256,19 +256,19 @@ for the `hardware` extra is a manual pass on a Raspberry Pi:
 
 ## Documentation
 
-Full guides live in the [wiki](https://github.com/magmacrunchmedia/texastoast/wiki);
+Full guides live in the [wiki](https://github.com/magmacrunch-media/texastoast/wiki);
 the reference below covers the whole public API.
 
 | Guide | Covers |
 |-------|--------|
-| [Getting Started](https://github.com/magmacrunchmedia/texastoast/wiki/Getting-Started) | Build a small game from nothing |
-| [Core Concepts](https://github.com/magmacrunchmedia/texastoast/wiki/Core-Concepts) | The loop, `dt`, how the pieces fit |
-| [Rendering and Camera](https://github.com/magmacrunchmedia/texastoast/wiki/Rendering-and-Camera) | Drawing, camera easing, the backend protocols |
-| [Input](https://github.com/magmacrunchmedia/texastoast/wiki/Input) | Sources, `InputState`, record and replay |
-| [UI Components](https://github.com/magmacrunchmedia/texastoast/wiki/UI-Components) | Dialogue, menus, HUD, drawing groups |
-| [Magma Hub and I2C](https://github.com/magmacrunchmedia/texastoast/wiki/Magma-Hub-and-I2C) | The wire protocol and hardware interface |
-| [Hardware Dev Kit](https://github.com/magmacrunchmedia/texastoast/wiki/Hardware-Dev-Kit) | Simulator, test bench, polling, recording |
-| [Tile Editor](https://github.com/magmacrunchmedia/texastoast/wiki/Tile-Editor) | The map editor and its JSON format |
+| [Getting Started](https://github.com/magmacrunch-media/texastoast/wiki/Getting-Started) | Build a small game from nothing |
+| [Core Concepts](https://github.com/magmacrunch-media/texastoast/wiki/Core-Concepts) | The loop, `dt`, how the pieces fit |
+| [Rendering and Camera](https://github.com/magmacrunch-media/texastoast/wiki/Rendering-and-Camera) | Drawing, camera easing, the backend protocols |
+| [Input](https://github.com/magmacrunch-media/texastoast/wiki/Input) | Sources, `InputState`, record and replay |
+| [UI Components](https://github.com/magmacrunch-media/texastoast/wiki/UI-Components) | Dialogue, menus, HUD, drawing groups |
+| [Magma Hub and I2C](https://github.com/magmacrunch-media/texastoast/wiki/Magma-Hub-and-I2C) | The wire protocol and hardware interface |
+| [Hardware Dev Kit](https://github.com/magmacrunch-media/texastoast/wiki/Hardware-Dev-Kit) | Simulator, test bench, polling, recording |
+| [Tile Editor](https://github.com/magmacrunch-media/texastoast/wiki/Tile-Editor) | The map editor and its JSON format |
 
 ## API Reference
 
@@ -615,7 +615,7 @@ style kwargs still beat the theme, so existing games render unchanged.
 
 ## Scripting with magmascript
 
-texastoast publishes itself to [magmascript](https://github.com/magmacrunchmedia/magmascript)
+texastoast publishes itself to [magmascript](https://github.com/magmacrunch-media/magmascript)
 as the `texastoast` domain, or `tt` for short. Install both into the same
 environment and `.mgs` scripts can drive the engine directly — neither package
 depends on the other.
