@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/magmacrunchmedia/texastoast.git
+git clone https://github.com/magmacrunch-media/texastoast.git
 cd texastoast
 pip install -e ".[dev,sprites,hardware]"
 ```

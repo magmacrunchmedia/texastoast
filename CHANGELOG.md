@@ -452,7 +452,7 @@ the first seam toward a non-tkinter rendering backend.
 
 A second correctness pass, over the parts 0.2.0 did not reach — the UI widgets
 and the camera — plus a scripting surface for
-[magmascript](https://github.com/magmacrunchmedia/magmascript).
+[magmascript](https://github.com/magmacrunch-media/magmascript).
 
 ### Breaking
 
@@ -535,7 +535,7 @@ own README described; fixing the movement one required a breaking API change.
   Previously `speed` was applied per *frame*, so `speed=100` moved an entity
   100 px every frame — 3000 px/s at 30 fps — while the docs described it as a
   walking pace. `speed` is now pixels per second and movement is frame-rate
-  independent. See [Migrating to 0.2.0](https://github.com/magmacrunchmedia/texastoast/wiki/Migrating-to-0.2.0).
+  independent. See [Migrating to 0.2.0](https://github.com/magmacrunch-media/texastoast/wiki/Migrating-to-0.2.0).
 - **`I2CBus.read_byte_data()` and `read_i2c_block_data()` return `None` on
   failure** instead of fabricating `0x00` bytes, so callers can tell a missing
   device from a device reporting zero.
