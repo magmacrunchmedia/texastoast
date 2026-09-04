@@ -161,6 +161,41 @@ def test_asking_for_a_tk_backend_without_tkinter_explains_itself(attr):
     assert out == "guided"
 
 
+def test_a_half_installed_tkinter_is_still_guided():
+    """The shape that broke the headless CI job on its first run.
+
+    ``python:*-slim`` ships ``tkinter/`` but not ``libtk8.6.so``, so
+    ``import tkinter`` fails *inside* ``import _tkinter`` with a plain
+    ImportError carrying the loader's message and, on some platforms, no
+    ``name`` at all. Keying only on ``exc.name`` let that fall through to a raw
+    "cannot open shared object file", which says even less than the
+    missing-module error the guidance exists to replace.
+    """
+    out = _probe("""
+        import sys
+        # A tkinter that exists but cannot load — no name= on the exception,
+        # which is the worst case and the one importorskip does not catch.
+        # find_spec, not the find_module/load_module pair: that API was removed
+        # in 3.12, so a finder using it is silently never consulted.
+        class Blocker:
+            def find_spec(self, name, path=None, target=None):
+                if name == "tkinter":
+                    raise ImportError("libtk8.6.so: cannot open shared object file")
+                return None
+        sys.meta_path.insert(0, Blocker())
+        import texastoast
+        try:
+            texastoast.Game
+        except ImportError as exc:
+            msg = str(exc)
+            print("guided" if "needs tkinter" in msg and "libtk" not in msg
+                  else f"unhelpful: {msg}")
+        else:
+            print("no error raised")
+    """)
+    assert out == "guided"
+
+
 def test_a_broken_backend_import_is_not_blamed_on_tkinter():
     # reraise_tk keys off ImportError.name, so an unrelated failure inside a
     # backend module surfaces as itself rather than sending the reader off to

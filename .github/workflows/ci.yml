@@ -66,8 +66,12 @@ jobs:
   # tkinter, no display, no extras. The matrix above cannot cover it — it
   # installs python3-tk and sets TEXASTOAST_REQUIRE_TK=1 — which is how a leak
   # that made `import texastoast; texastoast.Config` pull tkinter in went
-  # unnoticed. python:*-slim omits the Tk libraries, so the absence is real
-  # here rather than simulated with sys.modules as the unit tests must.
+  # unnoticed. python:*-slim omits the Tcl/Tk shared objects, so the failure is
+  # real here rather than simulated with sys.modules as the unit tests must.
+  # Note it ships tkinter/ itself and only the libraries are missing, so
+  # `import tkinter` raises a plain ImportError from inside `import _tkinter`,
+  # not ModuleNotFoundError. That distinction broke this job on its first run:
+  # pytest.importorskip catches only the latter.
   headless:
     runs-on: ubuntu-latest
     container: python:3.12-slim
@@ -78,13 +82,14 @@ jobs:
       # again, this job would otherwise keep reporting green while testing
       # nothing it exists to test — the same trap TEXASTOAST_REQUIRE_TK guards
       # against on the display side.
-      - name: Confirm tkinter really is absent
+      - name: Confirm tkinter really is unimportable
         run: |
           if python -c "import tkinter" 2>/dev/null; then
             echo "::error::tkinter is importable here, so this job no longer tests the headless path"
             exit 1
           fi
-          echo "tkinter absent, as intended"
+          echo "tkinter unimportable, as intended:"
+          python -c "import tkinter" 2>&1 | tail -1 || true
 
       # No extras: this is what a bare `pip install texastoast` gives the Pi.
       - run: pip install -e ".[dev]"

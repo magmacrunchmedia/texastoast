@@ -21,8 +21,13 @@ def test_a_tkinter_root_satisfies_the_protocol():
     # loop worked before the protocol existed, and why naming it broke nothing.
     # Imported here rather than at module scope: this is the only test in the
     # file that needs Tk, and the module docstring's claim is only true if the
-    # loop tests below still run on a machine that has none.
-    tk = pytest.importorskip("tkinter", reason="tkinter is not installed")
+    # loop tests below still run on a machine that has none. Not importorskip:
+    # it does not catch the plain ImportError a missing libtk raises.
+    from conftest import TK_IMPORTABLE
+
+    if not TK_IMPORTABLE:
+        pytest.skip("tkinter cannot be imported")
+    import tkinter as tk
 
     assert isinstance(tk.Misc, type)
     assert hasattr(tk.Misc, "after")

@@ -1,12 +1,18 @@
 """Renderer tests — these drive a real tkinter canvas and inspect what landed."""
 import pytest
 
-# requires_tk skips on a missing *display*; this skips on a missing tkinter,
-# which is a separate OS package on Debian and Raspberry Pi OS. Without it the
-# module fails to collect there, taking the whole suite down with it.
-tk = pytest.importorskip("tkinter", reason="tkinter is not installed")
+# requires_tk skips on a missing *display*; this skips where tkinter cannot be
+# imported at all, which is a separate condition (a separate OS package on
+# Debian, and a missing libtk in python:*-slim). Without it the module fails to
+# collect there, taking the whole suite down with it. conftest owns the check
+# because pytest.importorskip does not catch the libtk shape -- that raises a
+# plain ImportError, not ModuleNotFoundError.
+from conftest import TK_IMPORTABLE, requires_tk
 
-from conftest import requires_tk
+if not TK_IMPORTABLE:
+    pytest.skip("tkinter cannot be imported", allow_module_level=True)
+
+import tkinter as tk
 
 from texastoast.render.canvas import CanvasRenderer
 from texastoast.world.tilemap import TileMap

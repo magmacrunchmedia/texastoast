@@ -6,11 +6,12 @@ been destroyed fails with `invalid command name "tcl_findLibrary"`.
 """
 import pytest
 
-# See test_render.py: skips a missing tkinter, where requires_tk skips a
-# missing display. Both conditions have to be handled to collect on a Pi.
-pytest.importorskip("tkinter", reason="tkinter is not installed")
+# See test_render.py: skips where tkinter cannot be imported, where requires_tk
+# skips a missing display. Both conditions have to be handled to collect on a Pi.
+from conftest import TK_IMPORTABLE, requires_tk
 
-from conftest import requires_tk
+if not TK_IMPORTABLE:
+    pytest.skip("tkinter cannot be imported", allow_module_level=True)
 
 from texastoast.core.game import Game
 from texastoast.input.keyboard import KeyboardInput

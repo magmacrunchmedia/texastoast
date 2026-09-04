@@ -22,10 +22,13 @@ def test_entities_factory():
 def test_sprite_sheet_factory():
     # The one factory here backed by tkinter, so its import is local — the
     # module docstring's "headless" only holds if the rest still collects
-    # where tkinter is absent.
-    SpriteSheet = pytest.importorskip(
-        "texastoast.render.sprite", reason="tkinter is not installed"
-    ).SpriteSheet
+    # where tkinter is absent. Not importorskip: it does not catch the plain
+    # ImportError a missing libtk raises.
+    from conftest import TK_IMPORTABLE
+
+    if not TK_IMPORTABLE:
+        pytest.skip("tkinter cannot be imported")
+    from texastoast.render.sprite import SpriteSheet
 
     sheet = tt.sprite_sheet("sheet.png", 16, 16)
     assert isinstance(sheet, SpriteSheet)

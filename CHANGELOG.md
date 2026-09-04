@@ -51,9 +51,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot supply it, and pointing at `[tui]` as the display-free alternative —
   matching what the terminal backend has always done for Textual.
 
-  The guard keys off `ImportError.name`, so an unrelated broken import inside a
-  backend module still surfaces as itself rather than sending the reader off to
-  install a Tk they already have.
+  An unrelated broken import inside a backend module still surfaces as itself
+  rather than sending the reader off to install a Tk they already have.
+
+  There are two shapes of missing Tk, and both are handled. Where the package
+  is absent, `import tkinter` raises `ModuleNotFoundError` naming it. Where the
+  Python half is present but the Tcl/Tk shared objects are not — `python:*-slim`,
+  and CPython builds configured without Tk — it raises a *plain* `ImportError`
+  from inside `import _tkinter`, carrying the loader's message and, depending
+  on the platform, no `name` at all. Keying only on `ImportError.name` let that
+  second case fall through to a raw "libtk8.6.so: cannot open shared object
+  file", which says less than the error the guidance replaces. It is also the
+  case `pytest.importorskip` does not catch, so the test modules that need Tk
+  ask `conftest` rather than rolling their own check.
 
 ### Added
 

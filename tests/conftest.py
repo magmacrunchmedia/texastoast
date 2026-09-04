@@ -4,11 +4,20 @@ Some of the engine is only meaningful against a real tkinter canvas. Those
 tests are skipped rather than failed when no display is available, so the
 suite still runs on a headless machine.
 
-There are two distinct ways tkinter can be unusable, and only one of them used
-to be handled. "Installed but no display" was; "not installed at all" was not,
-because the import below sat at module scope — so on a Raspberry Pi OS Lite
-image, where tkinter is a separate ``python3-tk`` package, the suite failed to
-*collect* rather than skipping. Both now fold into ``TK_AVAILABLE``.
+There are three distinct ways tkinter can be unusable, and only one of them used
+to be handled:
+
+* **Installed, but no display.** Handled all along — ``TK_AVAILABLE``.
+* **Not installed at all.** A Raspberry Pi OS Lite image, where tkinter is a
+  separate ``python3-tk`` package. ``ModuleNotFoundError``.
+* **The Python half installed, the C extension unusable.** ``python:*-slim``
+  ships ``tkinter/`` but not ``libtk8.6.so``, so ``import tkinter`` fails inside
+  ``import _tkinter`` with a plain ``ImportError`` — *not* a subclass of the
+  above. ``pytest.importorskip`` does not catch this one, which is why the
+  modules that need Tk ask ``TK_IMPORTABLE`` here rather than rolling their own.
+
+The import below catches ``ImportError``, so the last two both fold into
+``TK_IMPORTABLE`` and all three into ``TK_AVAILABLE``.
 
 One Tk root is created for the whole session and never torn down early. Both
 parts matter: creating a second root after destroying the first fails on some
@@ -21,8 +30,12 @@ import pytest
 
 try:
     import tkinter as tk
-except ImportError:  # tkinter not installed at all
+except ImportError:  # not installed, or installed without a working libtk
     tk = None
+
+#: Whether ``import tkinter`` works at all, display or no. Modules that cannot
+#: even be imported without Tk skip on this; ``requires_tk`` is about a display.
+TK_IMPORTABLE = tk is not None
 
 if tk is None:
     _ROOT = None

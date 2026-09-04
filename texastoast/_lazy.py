@@ -30,6 +30,22 @@ _TK_FIXES = {
 #: half is present and only this is absent, which fails just as hard.
 _TK_MODULES = frozenset({"tkinter", "_tkinter"})
 
+#: The other shape the same failure takes. ``python:*-slim`` ships ``tkinter/``
+#: but not the Tcl/Tk shared objects, so ``import tkinter`` dies inside
+#: ``import _tkinter`` with a plain ``ImportError`` carrying the loader's
+#: message — and, depending on the platform's loader, no ``name`` at all.
+#: Matching the library name keeps that case from falling through to a raw
+#: "libtk8.6.so: cannot open shared object file", which is even less
+#: actionable than the missing-module message this exists to replace.
+_TK_LIB_MARKERS = ("libtk", "libtcl", "_tkinter", "tk8", "tcl8")
+
+
+def _is_tk_failure(exc: ImportError) -> bool:
+    if getattr(exc, "name", None) in _TK_MODULES:
+        return True
+    text = str(exc).lower()
+    return any(marker in text for marker in _TK_LIB_MARKERS)
+
 
 def reraise_tk(name: str, exc: ImportError) -> None:
     """Re-raise *exc* with the fix in it, if tkinter is what went missing.
@@ -39,7 +55,7 @@ def reraise_tk(name: str, exc: ImportError) -> None:
     broken import inside a backend module would be reported as a missing Tk,
     sending the reader off to install a package they already have.
     """
-    if getattr(exc, "name", None) not in _TK_MODULES:
+    if not _is_tk_failure(exc):
         return
 
     fix = _TK_FIXES.get(sys.platform, "install your platform's Tk package for Python")
