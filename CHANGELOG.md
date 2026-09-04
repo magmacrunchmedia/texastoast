@@ -5,7 +5,7 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.2] — 2026-09-04
 
 ### Fixed
 
@@ -34,9 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tkinter the suite failed to *collect* rather than skipping. It distinguished
   "no display" from "working display" but not "not installed at all" — which is
   precisely the Raspberry Pi OS Lite case, and the reason none of this was ever
-  caught. Seven test modules had the same problem and are now either guarded
-  with `pytest.importorskip` or import their tkinter-backed names locally,
-  keeping the headless tests in files that have both kinds.
+  caught. Seven test modules had the same problem; they now consult
+  `conftest`'s `TK_IMPORTABLE`, or import their tkinter-backed names locally
+  where the file also holds headless tests worth keeping.
 
 ### Changed
 
@@ -71,8 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   libraries — the configuration a Pi Lite image actually has. The existing
   Linux matrix installs `python3-tk` and sets `TEXASTOAST_REQUIRE_TK=1`, so it
   could not have caught any of the above. The job asserts tkinter is genuinely
-  absent before running, so a base-image change cannot quietly turn it green
-  while testing nothing.
+  unimportable before running, so a base-image change cannot quietly turn it
+  green while testing nothing.
 
 - **A "Running headless" section in README.md**, with a table of what is and is
   not available without tkinter, and the terminal-plus-I2C wiring a cabinet
