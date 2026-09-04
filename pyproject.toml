@@ -91,3 +91,12 @@ ignore = [
 # Examples read top-to-bottom as tutorials; imports next to their use is
 # deliberate there.
 "examples/*" = ["E402"]
+
+# These modules call pytest.importorskip("tkinter") before importing anything
+# tk-backed, so that a machine without tkinter — a Raspberry Pi OS Lite image,
+# say — skips them instead of failing to collect the whole suite. The skip has
+# to precede the imports it guards, which is exactly what E402 forbids.
+"tests/test_game.py" = ["E402"]
+"tests/test_render.py" = ["E402"]
+"tests/test_render_protocol.py" = ["E402"]
+"tests/test_ui.py" = ["E402"]

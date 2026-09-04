@@ -29,20 +29,16 @@ the engine:
 from __future__ import annotations
 
 import dataclasses
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from texastoast.audio.mixer import Mixer
-from texastoast.core.game import Game
 from texastoast.i2c.bus import I2CBus
 from texastoast.i2c.hub import MagmaHub
 from texastoast.i2c.poller import HubPoller
 from texastoast.i2c.sim import simulated_hub
-from texastoast.input.keyboard import KeyboardInput
 from texastoast.input.magma_hub import CompositeInput, MagmaHubInput
 from texastoast.input.players import PlayerManager
 from texastoast.input.recording import InputRecorder, ReplayInput
-from texastoast.render.canvas import CanvasRenderer
-from texastoast.render.sprite import SpriteSheet
 from texastoast.scene import SceneStack
 from texastoast.ui.dialogue import DialogueBox
 from texastoast.ui.hud import HUD
@@ -51,6 +47,19 @@ from texastoast.ui.theme import DEFAULT_THEME, Theme
 from texastoast.world.entity import Entity
 from texastoast.world.group import EntityGroup
 from texastoast.world.tilemap import TileMap
+
+# The four tkinter-backed names are annotations here and constructor calls in
+# four factory methods, nothing more. Importing them at module scope made
+# `import texastoast.mgs` — and so magmascript's entry-point discovery of this
+# domain — fail outright where tkinter is absent, which is every headless Pi.
+# `from __future__ import annotations` makes the signatures below strings, so
+# the TYPE_CHECKING block serves type checkers and costs runtime nothing; each
+# method imports what it actually constructs.
+if TYPE_CHECKING:
+    from texastoast.core.game import Game
+    from texastoast.input.keyboard import KeyboardInput
+    from texastoast.render.canvas import CanvasRenderer
+    from texastoast.render.sprite import SpriteSheet
 
 __all__ = ["TexastoastDomain"]
 
@@ -105,6 +114,8 @@ class TexastoastDomain:
     # ── core ────────────────────────────────────────────────────────
 
     def game(self, opts: dict | None = None) -> Game:
+        from texastoast.core.game import Game
+
         o = _options(opts, {
             "title": "texastoast",
             "width": 640,
@@ -121,9 +132,13 @@ class TexastoastDomain:
         )
 
     def renderer(self, game: Game, width: int, height: int) -> CanvasRenderer:
+        from texastoast.render.canvas import CanvasRenderer
+
         return CanvasRenderer(game.canvas, int(_num(width)), int(_num(height)))
 
     def keyboard(self, game: Game) -> KeyboardInput:
+        from texastoast.input.keyboard import KeyboardInput
+
         return KeyboardInput(game.root)
 
     # ── world ───────────────────────────────────────────────────────
@@ -214,6 +229,8 @@ class TexastoastDomain:
                      frame_height: Any) -> SpriteSheet:
         """A sprite sheet. Frames are fetched with the game's root:
         ``sheet.get_frame(g.root, col, row)``."""
+        from texastoast.render.sprite import SpriteSheet
+
         return SpriteSheet(str(path), int(_num(frame_width)),
                            int(_num(frame_height)))
 

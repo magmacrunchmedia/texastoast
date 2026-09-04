@@ -1,3 +1,4 @@
+from texastoast import _lazy
 from texastoast.input.abstract import InputSource, InputState
 
 __all__ = [
@@ -9,7 +10,11 @@ __all__ = [
 
 def __getattr__(name):
     if name == "KeyboardInput":
-        from texastoast.input.keyboard import KeyboardInput
+        try:
+            from texastoast.input.keyboard import KeyboardInput
+        except ImportError as exc:  # pragma: no cover - depends on install
+            _lazy.reraise_tk(name, exc)
+            raise
         return KeyboardInput
     if name == "MagmaHubInput":
         from texastoast.input.magma_hub import MagmaHubInput

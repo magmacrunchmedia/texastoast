@@ -296,9 +296,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import tkinter as tk
-
+    # The Pi checklist in README.md sends people straight here, and a Lite image
+    # has no tkinter, so this is the likeliest place in the project to meet a
+    # bare ModuleNotFoundError. Parse args first: --help must work regardless.
     args = parse_args(argv)
+
+    try:
+        import tkinter as tk
+    except ImportError as exc:
+        from texastoast import _lazy
+        _lazy.reraise_tk("texastoast-bench", exc)
+        raise
 
     root = tk.Tk()
     root.title("texastoast controller bench")

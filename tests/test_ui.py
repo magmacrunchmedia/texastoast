@@ -4,9 +4,12 @@ The widgets draw onto the same canvas the renderer clears every frame, so the
 thing worth pinning down is that a widget which believes it is showing puts its
 items back on any render() — see test_dialogue_survives_a_canvas_clear.
 """
-import tkinter as tk
-
 import pytest
+
+# See test_render.py: skips a missing tkinter, where requires_tk skips a
+# missing display. Both conditions have to be handled to collect on a Pi.
+tk = pytest.importorskip("tkinter", reason="tkinter is not installed")
+
 from conftest import requires_tk
 
 from texastoast.ui import HUD, DialogueBox, Menu

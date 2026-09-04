@@ -1,7 +1,11 @@
 """Renderer tests — these drive a real tkinter canvas and inspect what landed."""
-import tkinter as tk
-
 import pytest
+
+# requires_tk skips on a missing *display*; this skips on a missing tkinter,
+# which is a separate OS package on Debian and Raspberry Pi OS. Without it the
+# module fails to collect there, taking the whole suite down with it.
+tk = pytest.importorskip("tkinter", reason="tkinter is not installed")
+
 from conftest import requires_tk
 
 from texastoast.render.canvas import CanvasRenderer

@@ -62,6 +62,47 @@ jobs:
           TEXASTOAST_REQUIRE_TK: "1"
         run: pytest -v
 
+  # The configuration a Raspberry Pi OS Lite image actually has: Linux, no
+  # tkinter, no display, no extras. The matrix above cannot cover it — it
+  # installs python3-tk and sets TEXASTOAST_REQUIRE_TK=1 — which is how a leak
+  # that made `import texastoast; texastoast.Config` pull tkinter in went
+  # unnoticed. python:*-slim omits the Tk libraries, so the absence is real
+  # here rather than simulated with sys.modules as the unit tests must.
+  headless:
+    runs-on: ubuntu-latest
+    container: python:3.12-slim
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail loudly rather than vacuously. If a base-image change ever ships Tk
+      # again, this job would otherwise keep reporting green while testing
+      # nothing it exists to test — the same trap TEXASTOAST_REQUIRE_TK guards
+      # against on the display side.
+      - name: Confirm tkinter really is absent
+        run: |
+          if python -c "import tkinter" 2>/dev/null; then
+            echo "::error::tkinter is importable here, so this job no longer tests the headless path"
+            exit 1
+          fi
+          echo "tkinter absent, as intended"
+
+      # No extras: this is what a bare `pip install texastoast` gives the Pi.
+      - run: pip install -e ".[dev]"
+
+      - name: Import the engine with no display, no tkinter and no extras
+        run: |
+          python -c "
+          import texastoast
+          for name in ('Config', 'GameLoop', 'ManualScheduler', 'TuiRenderer',
+                       'CellBuffer', 'TileMap', 'Entity', 'InputState',
+                       'MagmaHub', 'SimBus', 'Menu', 'Mixer'):
+              getattr(texastoast, name)
+          print('engine imports clean on', texastoast.__version__)
+          "
+
+      # The tk-backed tests skip here by design; everything else must pass.
+      - run: pytest -v
+
   build:
     runs-on: ubuntu-latest
     steps:

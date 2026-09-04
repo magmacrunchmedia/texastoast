@@ -5,6 +5,71 @@ All notable changes to texastoast are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **tkinter was a hard dependency in three places that all claimed it was not.**
+
+  The engine's whole design treats tkinter as one optional backend among
+  several, and `tests/test_no_hard_deps.py` exists to hold that line. Three
+  leaks got past it, each invisible for the same reason: the tests reached for
+  deep module paths, and every leak was one level above them.
+
+  `texastoast.Config` and `texastoast.GameLoop` imported tkinter. The top-level
+  `__getattr__` answered all three of `Config`, `GameLoop` and `Game` from one
+  `from texastoast.core import Config, Game, GameLoop`, and a from-import
+  resolves every name it lists — so asking for the config object built a
+  tkinter host to get there. Every other branch in that file already used
+  `getattr` for exactly this reason and said so in a comment.
+
+  `texastoast.mgs` imported `Game` at module scope, so importing the module —
+  and therefore magmascript's entry-point discovery of the domain — failed
+  outright wherever tkinter was absent, despite the module's own docstring
+  promising "no tkinter import". The four tkinter-backed names are annotations
+  and four constructor calls; they now sit behind `TYPE_CHECKING` and local
+  imports.
+
+  `tests/conftest.py` imported tkinter at module scope, so on a machine with no
+  tkinter the suite failed to *collect* rather than skipping. It distinguished
+  "no display" from "working display" but not "not installed at all" — which is
+  precisely the Raspberry Pi OS Lite case, and the reason none of this was ever
+  caught. Seven test modules had the same problem and are now either guarded
+  with `pytest.importorskip` or import their tkinter-backed names locally,
+  keeping the headless tests in files that have both kinds.
+
+### Changed
+
+- **A missing tkinter now names the fix instead of the module.**
+
+  `ModuleNotFoundError: No module named 'tkinter'` is the least useful possible
+  message on the one platform where the answer is not a pip install: tkinter
+  ships with CPython on Windows and macOS but is a separate `python3-tk`
+  package on Debian and Raspberry Pi OS. `Game`, `CanvasRenderer`,
+  `SpriteSheet`, `KeyboardInput` and `texastoast-bench` now raise an
+  `ImportError` naming the platform's own package manager, saying that pip
+  cannot supply it, and pointing at `[tui]` as the display-free alternative —
+  matching what the terminal backend has always done for Textual.
+
+  The guard keys off `ImportError.name`, so an unrelated broken import inside a
+  backend module still surfaces as itself rather than sending the reader off to
+  install a Tk they already have.
+
+### Added
+
+- **A `headless` CI job**, running the suite in a container with no Tk
+  libraries — the configuration a Pi Lite image actually has. The existing
+  Linux matrix installs `python3-tk` and sets `TEXASTOAST_REQUIRE_TK=1`, so it
+  could not have caught any of the above. The job asserts tkinter is genuinely
+  absent before running, so a base-image change cannot quietly turn it green
+  while testing nothing.
+
+- **A "Running headless" section in README.md**, with a table of what is and is
+  not available without tkinter, and the terminal-plus-I2C wiring a cabinet
+  actually uses. `[tui]` was missing from the documented extras entirely, so
+  the display-free path — the one that matters on a Pi — was not advertised
+  anywhere in the install docs.
+
 ## [0.11.1] — 2026-08-29
 
 ### Changed

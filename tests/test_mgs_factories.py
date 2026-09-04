@@ -4,7 +4,6 @@ import pytest
 from texastoast.audio.mixer import Mixer
 from texastoast.input.players import PlayerManager
 from texastoast.mgs import TexastoastDomain
-from texastoast.render.sprite import SpriteSheet
 from texastoast.scene import SceneStack
 from texastoast.ui.theme import DEFAULT_THEME, Theme
 from texastoast.world.group import EntityGroup
@@ -21,6 +20,13 @@ def test_entities_factory():
 
 
 def test_sprite_sheet_factory():
+    # The one factory here backed by tkinter, so its import is local — the
+    # module docstring's "headless" only holds if the rest still collects
+    # where tkinter is absent.
+    SpriteSheet = pytest.importorskip(
+        "texastoast.render.sprite", reason="tkinter is not installed"
+    ).SpriteSheet
+
     sheet = tt.sprite_sheet("sheet.png", 16, 16)
     assert isinstance(sheet, SpriteSheet)
 

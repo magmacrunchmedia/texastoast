@@ -5,6 +5,11 @@ test is not an option: on some Tcl builds, creating a root after another has
 been destroyed fails with `invalid command name "tcl_findLibrary"`.
 """
 import pytest
+
+# See test_render.py: skips a missing tkinter, where requires_tk skips a
+# missing display. Both conditions have to be handled to collect on a Pi.
+pytest.importorskip("tkinter", reason="tkinter is not installed")
+
 from conftest import requires_tk
 
 from texastoast.core.game import Game

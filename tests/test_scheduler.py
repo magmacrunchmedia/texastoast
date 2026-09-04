@@ -6,7 +6,7 @@ drive the loop instead. The proof is below: a fully exercised game loop with no
 tkinter, no display, and no sleeping.
 """
 
-import tkinter as tk
+import pytest
 
 from texastoast.core.loop import GameLoop
 from texastoast.core.scheduler import ManualScheduler, Scheduler
@@ -19,6 +19,11 @@ def test_manual_scheduler_satisfies_the_protocol():
 def test_a_tkinter_root_satisfies_the_protocol():
     # Structural, so this holds without importing a display — it is why the
     # loop worked before the protocol existed, and why naming it broke nothing.
+    # Imported here rather than at module scope: this is the only test in the
+    # file that needs Tk, and the module docstring's claim is only true if the
+    # loop tests below still run on a machine that has none.
+    tk = pytest.importorskip("tkinter", reason="tkinter is not installed")
+
     assert isinstance(tk.Misc, type)
     assert hasattr(tk.Misc, "after")
     assert hasattr(tk.Misc, "after_cancel")

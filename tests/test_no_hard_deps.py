@@ -105,6 +105,75 @@ def test_the_game_loop_needs_no_tkinter():
     assert out == "4 False"
 
 
+# The tests above reach for deep module paths, which is how a leak in the *lazy
+# hooks* hid behind them: `texastoast.Config` grouped Config, GameLoop and Game
+# into one from-import, and a from-import resolves every name it lists, so
+# asking for Config imported Game and with it tkinter. Reading the attribute off
+# the top-level package is what a game actually does, so test that.
+@pytest.mark.parametrize("attr", [
+    "Config", "GameLoop", "ManualScheduler", "Scheduler",
+    "TuiRenderer", "CellBuffer", "Cell", "Camera", "Renderer", "UISurface",
+    "TileMap", "Entity", "AABB", "EntityGroup",
+    "InputState", "InputRecorder", "ReplayInput", "Player", "PlayerManager",
+    "Scene", "SceneStack", "Mixer",
+    "I2CBus", "MagmaHub", "ControllerState", "HubStats", "SimBus",
+    "simulated_hub", "HubPoller", "scan_buses_async",
+    "DialogueBox", "Menu", "HUD", "Theme", "DEFAULT_THEME",
+])
+def test_the_display_free_api_is_reachable_without_tkinter(attr):
+    """Every public name that is not a tkinter backend must resolve without it.
+
+    Blocking the import rather than checking ``sys.modules`` afterwards: this
+    fails loudly at the leak instead of reporting a name that merely *happened*
+    to be imported early by something else in the probe.
+    """
+    out = _probe(f"""
+        import sys
+        sys.modules["tkinter"] = None  # force ImportError on `import tkinter`
+        import texastoast
+        texastoast.{attr}
+        print("ok")
+    """)
+    assert out == "ok"
+
+
+@pytest.mark.parametrize("attr", ["Game", "CanvasRenderer", "SpriteSheet", "KeyboardInput"])
+def test_asking_for_a_tk_backend_without_tkinter_explains_itself(attr):
+    # The counterpart to the [tui] message: name the fix, and note that pip is
+    # not it. On Raspberry Pi OS Lite this is the first thing a user meets.
+    out = _probe(f"""
+        import sys
+        sys.modules["tkinter"] = None
+        import texastoast
+        try:
+            texastoast.{attr}
+        except ImportError as exc:
+            msg = str(exc)
+            # The install command is platform-specific; what must always be
+            # there is what broke, that pip will not fix it, and the way out.
+            guided = ("needs tkinter" in msg
+                      and "pip cannot supply it" in msg
+                      and "texastoast[tui]" in msg)
+            print("guided" if guided else f"unhelpful: {{msg}}")
+        else:
+            print("no error raised")
+    """)
+    assert out == "guided"
+
+
+def test_a_broken_backend_import_is_not_blamed_on_tkinter():
+    # reraise_tk keys off ImportError.name, so an unrelated failure inside a
+    # backend module surfaces as itself rather than sending the reader off to
+    # install a Tk they already have.
+    out = _probe("""
+        from texastoast import _lazy
+        exc = ModuleNotFoundError("No module named 'nope'", name="nope")
+        _lazy.reraise_tk("Thing", exc)   # must return, not raise
+        print("passed through")
+    """)
+    assert out == "passed through"
+
+
 def test_asking_for_the_tui_host_without_the_extra_explains_itself():
     # Simulate the extra being absent by blocking the import, and check the
     # error names the fix rather than surfacing a bare ModuleNotFoundError.

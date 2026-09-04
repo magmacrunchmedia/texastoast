@@ -5,8 +5,11 @@ __version__ = "0.11.1"
 
 def __getattr__(name):
     if name in ("Config", "GameLoop", "Game"):
-        from texastoast.core import Config, Game, GameLoop
-        return {"Config": Config, "GameLoop": GameLoop, "Game": Game}[name]
+        # getattr, not a from-import: the group resolves every name it lists, so
+        # a from-import here pulled Game (and with it tkinter) in to answer for
+        # Config and GameLoop, neither of which has ever needed it.
+        from texastoast import core
+        return getattr(core, name)
 
     if name in ("ArcadeGame", "GameInfo", "Host", "discover_games"):
         from texastoast import arcade

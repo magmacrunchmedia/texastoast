@@ -1,7 +1,10 @@
 from conftest import requires_tk
 
 from texastoast.input.abstract import InputState
-from texastoast.input.keyboard import KeyboardInput
+
+# KeyboardInput is imported inside the two tests that use it, not here: it
+# pulls tkinter, and the four InputState tests below are pure logic that must
+# still run on a machine without it. @requires_tk covers those two.
 
 
 def test_input_state_defaults():
@@ -50,6 +53,8 @@ def test_keys_sharing_a_button_do_not_release_each_other(tk_root):
     Releasing one alias used to clear the button outright, so holding Left and
     tapping `a` stopped the player mid-stride.
     """
+    from texastoast.input.keyboard import KeyboardInput
+
     keyboard = KeyboardInput(tk_root)
 
     keyboard._press("Left", "left")
@@ -66,6 +71,8 @@ def test_keys_sharing_a_button_do_not_release_each_other(tk_root):
 @requires_tk
 def test_poll_returns_a_snapshot_not_the_live_state(tk_root):
     """Edge detection needs the previous frame to stay put."""
+    from texastoast.input.keyboard import KeyboardInput
+
     keyboard = KeyboardInput(tk_root)
 
     previous = keyboard.poll()

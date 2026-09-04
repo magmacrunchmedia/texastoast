@@ -4,9 +4,12 @@ The seam that a future SDL/framebuffer backend will implement. What matters
 now is that CanvasRenderer satisfies both protocols structurally, and that
 group-scoped drawing keeps the tag-composition behaviour the UI relies on.
 """
-import tkinter as tk
-
 import pytest
+
+# See test_render.py: skips a missing tkinter, where requires_tk skips a
+# missing display. Both conditions have to be handled to collect on a Pi.
+tk = pytest.importorskip("tkinter", reason="tkinter is not installed")
+
 from conftest import requires_tk
 
 from texastoast.render.abstract import Renderer, UISurface, as_ui_surface

@@ -7,7 +7,12 @@
 
 Python RPG engine with I2C hardware abstraction for magmacrunch game systems.
 
-A tkinter-based 2D game engine inspired by [adenosine](https://github.com/magmacrunch-media/adenosine), with optional I2C support for Raspberry Pi hardware.
+A 2D game engine inspired by [adenosine](https://github.com/magmacrunch-media/adenosine), with optional I2C support for Raspberry Pi hardware.
+
+It has two hosts and the same game code runs on either: `Game` draws to a
+tkinter window, and [`TuiGame`](#running-in-a-terminal) draws to a terminal.
+The terminal host needs no display, which is what makes the engine usable over
+SSH and on a Raspberry Pi OS Lite image — see [Running headless](#running-headless).
 
 It ships a [hardware dev kit](#hardware-dev-kit) too: a simulator, a controller
 test bench, and session record/replay, so you can build and test against I2C
@@ -26,6 +31,7 @@ pip install texastoast
 Optional extras:
 
 ```bash
+pip install "texastoast[tui]"       # textual, for the terminal host (no display needed)
 pip install "texastoast[sprites]"   # Pillow, for sprite sheet cropping
 pip install "texastoast[hardware]"  # smbus2, for I2C controllers on Raspberry Pi
 pip install "texastoast[audio]"     # pygame-ce, for real audio mixing
@@ -34,6 +40,18 @@ pip install "texastoast[audio]"     # pygame-ce, for real audio mixing
 None are required — the engine runs on keyboard input with no extras
 installed, and without `[audio]` sound degrades to the platform's basic
 player (or to silence) rather than failing.
+
+The one thing pip cannot supply is **tkinter**, which the `Game` host needs.
+It ships with Python on Windows and macOS, but Debian and Raspberry Pi OS
+package it separately:
+
+```bash
+sudo apt install python3-tk
+```
+
+You only need it for the tkinter host. `TuiGame` and everything below it — the
+loop, world, input, audio, UI and the whole I2C stack — import no tkinter at
+all, so `[tui]` is the complete answer on a machine without it.
 
 ### From source
 
@@ -242,7 +260,12 @@ a regression test that runs anywhere.
 ### Testing on the Pi
 
 CI covers all of the hardware *logic* through the simulator; the release gate
-for the `hardware` extra is a manual pass on a Raspberry Pi:
+for the `hardware` extra is a manual pass on a Raspberry Pi.
+
+`texastoast-bench` draws a tkinter window, so step 2 needs a desktop image (or
+an X session over SSH) and `python3-tk`. On a Lite image, do the bench pass on
+a Pi with a desktop and use [Running headless](#running-headless) for the rest —
+the hub, poller and recording are all display-free.
 
 1. `sudo raspi-config` → enable I2C; wire the hub; `i2cdetect -y 1` should
    show it at `0x08`–`0x0b`.
@@ -253,6 +276,49 @@ for the `hardware` extra is a manual pass on a Raspberry Pi:
    keep the file — it is the firmware regression corpus.
 4. Run `examples/magma_hub_demo.py` and confirm hub input drives the square
    and unplugging mid-game falls back to the keyboard.
+
+### Running headless
+
+A Raspberry Pi OS Lite image has no display and no tkinter, which is the
+configuration a cabinet actually runs in. Everything except the tkinter host
+works there:
+
+```bash
+pip install "texastoast[tui,hardware]"
+```
+
+```python
+from texastoast import I2CBus, MagmaHub, MagmaHubInput, TuiGame
+
+hub = MagmaHub.scan_buses(bus_numbers=[1])[0]
+controls = MagmaHubInput(hub, controller_index=0)
+
+game = TuiGame(title="cabinet", fps=30)
+game.set_update(lambda dt: step(dt, controls.poll()))
+game.set_render(render)
+game.start()
+```
+
+What is and is not available with no tkinter installed:
+
+| Available | Needs tkinter |
+|---|---|
+| `TuiGame`, `TuiRenderer`, `CellBuffer` | `Game` |
+| `GameLoop`, `Scheduler`, `ManualScheduler`, `Config` | `CanvasRenderer` |
+| `TileMap`, `Entity`, `AABB`, `EntityGroup`, scenes | `SpriteSheet` |
+| The whole I2C stack: `MagmaHub`, `SimBus`, `HubPoller`, record/replay | `KeyboardInput` |
+| `Mixer`, the UI widgets, `Theme` | `texastoast-bench` |
+
+Asking for one of the right-hand names without tkinter raises an `ImportError`
+naming the package to install, since pip cannot supply it. The
+`headless` CI job runs the suite in a container with no Tk libraries, so this
+column is enforced rather than aspirational.
+
+Two notes for a Pi specifically. `pip install texastoast && texastoast-bench
+--sim` — the command at the top of this README — is one of the tkinter cases;
+use `[tui]` and the snippet above instead. And the engine is pure Python with a
+per-frame loop, so benchmark your own game's frame budget on the target board
+rather than assuming a desktop frame rate carries over.
 
 ## Documentation
 

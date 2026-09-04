@@ -1,3 +1,4 @@
+from texastoast import _lazy
 from texastoast.core.config import Config
 from texastoast.core.scheduler import ManualScheduler, Scheduler
 
@@ -16,7 +17,11 @@ def __getattr__(name):
         from texastoast.core.loop import GameLoop
         return GameLoop
     if name == "Game":
-        from texastoast.core.game import Game
+        try:
+            from texastoast.core.game import Game
+        except ImportError as exc:  # pragma: no cover - depends on install
+            _lazy.reraise_tk(name, exc)
+            raise
         return Game
     if name in _HOST_NAMES:
         try:
